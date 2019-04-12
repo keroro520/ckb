@@ -84,21 +84,14 @@ impl<CS: ChainStore + 'static> MinerRpc for MinerRpcImpl<CS> {
             if ret.is_ok() {
                 debug!(target: "miner", "[block_relay] announce new block {} {}", block.header().hash(), unix_time_as_millis());
                 // announce new block
-                self.network_controller.with_protocol_context(
-                    NetworkProtocol::RELAY as ProtocolId,
-                    |mut nc| {
+                self.network_controller
+                    .broadcast(NetworkProtocol::RELAY as ProtocolId, {
                         let fbb = &mut FlatBufferBuilder::new();
                         let message =
                             RelayMessage::build_compact_block(fbb, &block, &HashSet::new());
                         fbb.finish(message, None);
-                        for peer in nc.connected_peers() {
-                            let ret = nc.send(peer, fbb.finished_data().to_vec());
-                            if ret.is_err() {
-                                warn!(target: "rpc", "relay block error {:?}", ret);
-                            }
-                        }
-                    },
-                );
+                        fbb.finished_data().to_vec()
+                    });
                 Ok(Some(block.header().hash().clone()))
             } else {
                 let chain_state = self.shared.chain_state().lock();
