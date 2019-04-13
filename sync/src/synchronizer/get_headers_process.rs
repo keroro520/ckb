@@ -1,7 +1,7 @@
 use crate::synchronizer::Synchronizer;
 use crate::{MAX_LOCATOR_SIZE, SYNC_USELESS_BAN_TIME};
 use ckb_core::header::Header;
-use ckb_network::{CKBProtocolContext, PeerIndex};
+use ckb_network::{CKBProtocolContext, SessionId};
 use ckb_protocol::{cast, GetHeaders, SyncMessage};
 use ckb_shared::store::ChainStore;
 use failure::Error as FailureError;
@@ -13,7 +13,7 @@ use std::convert::TryInto;
 pub struct GetHeadersProcess<'a, CS: ChainStore + 'a> {
     message: &'a GetHeaders<'a>,
     synchronizer: &'a Synchronizer<CS>,
-    peer: PeerIndex,
+    peer: SessionId,
     nc: &'a mut CKBProtocolContext,
 }
 
@@ -24,7 +24,7 @@ where
     pub fn new(
         message: &'a GetHeaders,
         synchronizer: &'a Synchronizer<CS>,
-        peer: PeerIndex,
+        peer: SessionId,
         nc: &'a mut CKBProtocolContext,
     ) -> Self {
         GetHeadersProcess {

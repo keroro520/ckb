@@ -1,6 +1,6 @@
 use crate::BAD_MESSAGE_BAN_TIME;
 use bytes::Bytes;
-use ckb_network::{CKBProtocolContext, CKBProtocolHandler, PeerIndex};
+use ckb_network::{CKBProtocolContext, CKBProtocolHandler, SessionId};
 use ckb_protocol::{get_root, TimeMessage};
 use ckb_util::RwLock;
 use flatbuffers::FlatBufferBuilder;
@@ -92,7 +92,7 @@ impl Default for NetTimeProtocol {
 
 impl CKBProtocolHandler for NetTimeProtocol {
     fn initialize(&self, _nc: &mut CKBProtocolContext) {}
-    fn received(&self, nc: &mut CKBProtocolContext, peer: PeerIndex, data: Bytes) {
+    fn received(&self, nc: &mut CKBProtocolContext, peer: SessionId, data: Bytes) {
         if nc.session_info(peer).map(|s| s.peer.is_outbound()) != Some(true) {
             info!(target: "network", "Peer {} is not outbound but sends us time message", peer);
             return;
@@ -121,7 +121,7 @@ impl CKBProtocolHandler for NetTimeProtocol {
         }
     }
 
-    fn connected(&self, mut nc: &mut CKBProtocolContext, peer: PeerIndex) {
+    fn connected(&self, mut nc: &mut CKBProtocolContext, peer: SessionId) {
         // send local time to inbound peers
         if nc.session_info(peer).map(|s| s.peer.is_inbound()) == Some(true) {
             let now = faketime::unix_time_as_millis();
@@ -134,7 +134,7 @@ impl CKBProtocolHandler for NetTimeProtocol {
             }
         }
     }
-    fn disconnected(&self, _nc: &mut CKBProtocolContext, _peer: PeerIndex) {}
+    fn disconnected(&self, _nc: &mut CKBProtocolContext, _peer: SessionId) {}
 }
 
 #[cfg(test)]
