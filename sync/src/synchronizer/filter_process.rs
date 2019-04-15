@@ -1,6 +1,6 @@
 use crate::synchronizer::Synchronizer;
 use crate::types::TransactionFilter;
-use ckb_network::PeerIndex;
+use ckb_network::SessionId;
 use ckb_protocol::{cast, AddFilter, SetFilter};
 use ckb_shared::store::ChainStore;
 use failure::Error as FailureError;
@@ -8,7 +8,7 @@ use failure::Error as FailureError;
 pub struct SetFilterProcess<'a, CS: ChainStore + 'a> {
     message: &'a SetFilter<'a>,
     synchronizer: &'a Synchronizer<CS>,
-    peer: PeerIndex,
+    peer: SessionId,
 }
 
 impl<'a, CS> SetFilterProcess<'a, CS>
@@ -18,7 +18,7 @@ where
     pub fn new(
         message: &'a SetFilter,
         synchronizer: &'a Synchronizer<CS>,
-        peer: PeerIndex,
+        peer: SessionId,
     ) -> Self {
         Self {
             peer,
@@ -45,7 +45,7 @@ where
 pub struct AddFilterProcess<'a, CS: ChainStore + 'a> {
     message: &'a AddFilter<'a>,
     synchronizer: &'a Synchronizer<CS>,
-    peer: PeerIndex,
+    peer: SessionId,
 }
 
 impl<'a, CS> AddFilterProcess<'a, CS>
@@ -55,7 +55,7 @@ where
     pub fn new(
         message: &'a AddFilter,
         synchronizer: &'a Synchronizer<CS>,
-        peer: PeerIndex,
+        peer: SessionId,
     ) -> Self {
         Self {
             peer,
@@ -76,14 +76,14 @@ where
 
 pub struct ClearFilterProcess<'a, CS: ChainStore + 'a> {
     synchronizer: &'a Synchronizer<CS>,
-    peer: PeerIndex,
+    peer: SessionId,
 }
 
 impl<'a, CS> ClearFilterProcess<'a, CS>
 where
     CS: ChainStore + 'a,
 {
-    pub fn new(synchronizer: &'a Synchronizer<CS>, peer: PeerIndex) -> Self {
+    pub fn new(synchronizer: &'a Synchronizer<CS>, peer: SessionId) -> Self {
         Self { peer, synchronizer }
     }
 

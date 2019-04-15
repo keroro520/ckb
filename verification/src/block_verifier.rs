@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_closure)]
 use crate::error::{CellbaseError, CommitError, Error, UnclesError};
 use crate::header_verifier::HeaderResolver;
 use crate::{InputVerifier, TransactionVerifier, Verifier};

@@ -8,7 +8,7 @@ use crate::{
     NetworkState, ServiceControl, SessionId, SessionInfo,
 };
 use bytes::Bytes;
-use log::{debug, error};
+use log::{debug, error, warn};
 use p2p::{
     builder::MetaBuilder,
     service::{ProtocolHandle, ProtocolMeta},

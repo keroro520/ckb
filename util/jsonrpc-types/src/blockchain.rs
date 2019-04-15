@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_closure)]
+
 use crate::proposal_short_id::ProposalShortId;
 use crate::Bytes;
 use ckb_core::block::{Block as CoreBlock, BlockBuilder};

@@ -1,3 +1,5 @@
+#![allow(clippy::redundant_closure)]
+
 use crate::protocol_generated::ckb::protocol::{
     Block as FbsBlock, BlockBuilder, BlockProposalBuilder, BlockTransactionsBuilder,
     Bytes as FbsBytes, BytesBuilder, CellInput as FbsCellInput, CellInputBuilder,

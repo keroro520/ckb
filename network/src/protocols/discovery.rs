@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_closure)]
 use fnv::FnvHashMap;
 use futures::{sync::mpsc, sync::oneshot, Future, Stream};
 use log::{debug, warn};

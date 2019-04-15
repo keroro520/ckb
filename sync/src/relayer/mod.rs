@@ -328,7 +328,6 @@ impl<CS: ChainStore> Relayer<CS> {
 }
 
 impl<CS: ChainStore> CKBProtocolHandler for Relayer<CS> {
-    fn initialize(&self, nc: Box<CKBProtocolContext>) {
     fn initialize(&self, nc: &mut dyn CKBProtocolContext) {
         nc.register_timer(Duration::from_millis(100), TX_PROPOSAL_TOKEN);
     }

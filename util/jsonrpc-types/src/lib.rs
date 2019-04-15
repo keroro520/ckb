@@ -15,3 +15,4 @@ pub use self::cell::{CellOutputWithOutPoint, CellWithStatus};
 pub use self::net::{Node, NodeAddress};
 pub use self::trace::{Action, TxTrace};
 pub use jsonrpc_core::types::{error, id, params, request, response, version};
+pub use trace::TxTrace;

@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_closure)]
 use crate::error::TransactionError;
 use ckb_core::transaction::{Capacity, OutPoint, Transaction, TX_VERSION};
 use ckb_core::{
