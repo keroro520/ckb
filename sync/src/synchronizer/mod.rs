@@ -1095,7 +1095,6 @@ mod tests {
     fn mock_session_info() -> SessionInfo {
         SessionInfo {
             peer: Peer::new(
-                0,
                 "/ip4/127.0.0.1".to_multiaddr().expect("parse multiaddr"),
                 1,
                 SessionType::Outbound,
@@ -1128,11 +1127,15 @@ mod tests {
             Ok(())
         }
         /// Report peer. Depending on the report, peer may be disconnected and possibly banned.
-        fn report_peer(&self, _peer: SessionId, _behaviour: Behaviour) -> Result<(), NetworkError> {
+        fn report_peer(
+            &mut self,
+            _peer: SessionId,
+            _behaviour: Behaviour,
+        ) -> Result<(), NetworkError> {
             Ok(())
         }
 
-        fn ban_peer(&self, _peer: SessionId, _duration: Duration) {}
+        fn ban_peer(&mut self, _peer: SessionId, _duration: Duration) {}
 
         /// Register a new IO timer. 'IoHandler::timeout' will be called with the token.
         fn register_timer(&self, _interval: Duration, _token: u64) {
@@ -1152,7 +1155,7 @@ mod tests {
             unimplemented!();
         }
 
-        fn disconnect(&self, peer: SessionId) {
+        fn disconnect(&mut self, peer: SessionId) {
             self.disconnected.lock().insert(peer);
         }
         fn protocol_id(&self) -> ProtocolId {
