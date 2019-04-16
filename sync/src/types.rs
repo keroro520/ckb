@@ -87,7 +87,7 @@ pub struct Peers {
     pub blocks_inflight: RwLock<FnvHashMap<SessionId, BlocksInflight>>,
     pub best_known_headers: RwLock<FnvHashMap<SessionId, HeaderView>>,
     pub last_common_headers: RwLock<FnvHashMap<SessionId, Header>>,
-    pub transaction_filters: RwLock<FnvHashMap<SessionId, TransactionFilter>>,
+    //pub transaction_filters: RwLock<FnvHashMap<SessionId, TransactionFilter>>,
     pub known_txs: Mutex<KnownFilter>,
     pub known_blocks: Mutex<KnownFilter>,
 }
