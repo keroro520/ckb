@@ -4,6 +4,8 @@ use ckb_protocol::{get_root, SyncMessage, SyncPayload};
 use ckb_sync::NetworkProtocol;
 use log::info;
 
+const SYNC: ProtocolId = ProtocolId::new(NetworkProtocol::SYNC as usize);
+
 pub struct MalformedMessage;
 
 impl Spec for MalformedMessage {
@@ -20,17 +22,9 @@ impl Spec for MalformedMessage {
         assert_eq!(SyncPayload::GetHeaders, msg.payload_type());
 
         info!("Send malformed message to node0 twice");
-        net.send(
-            NetworkProtocol::SYNC as ProtocolId,
-            peer_id,
-            vec![0, 0, 0, 0],
-        );
+        net.send(SYNC, peer_id, vec![0, 0, 0, 0]);
         sleep(3);
-        net.send(
-            NetworkProtocol::SYNC as ProtocolId,
-            peer_id,
-            vec![0, 1, 2, 3],
-        );
+        net.send(SYNC, peer_id, vec![0, 1, 2, 3]);
         sleep(3);
 
         info!("Node0 should disconnect test node");
@@ -60,7 +54,7 @@ impl Spec for MalformedMessage {
 
     fn test_protocols(&self) -> Vec<TestProtocol> {
         vec![TestProtocol {
-            id: NetworkProtocol::SYNC as ProtocolId,
+            id: SYNC,
             protocol_name: "syn".to_string(),
             supported_versions: vec![1],
         }]

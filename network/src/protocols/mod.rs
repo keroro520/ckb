@@ -179,7 +179,7 @@ impl<'a> CKBProtocolContext for DefaultCKBProtocolContext<'a> {
         // dial peer only after protocol is open
         if let Some(_) = version {
             self.p2p_control
-                .send_message(session_id, protocol_id, data)
+                .send_message_to(session_id, protocol_id, data)
                 .map_err(|_| {
                     Error::P2P(format!(
                         "error send to peer {:?} protocol {}",

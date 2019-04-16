@@ -330,7 +330,7 @@ impl NetworkService {
             recv(self.receivers.send_message_receiver) -> msg => match msg {
                 Ok(Request {responder, arguments: (session_id, protocol_id, data)}) => {
                     if let Err(err) = self.p2p_control.clone()
-                        .send_message(session_id, protocol_id, data.to_vec()){
+                        .send_message_to(session_id, protocol_id, data.to_vec()){
                             error!(target: "network", "failed to send message, error: {:?}", err);
                         }
                     let _ = responder.send(());

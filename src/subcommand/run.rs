@@ -46,19 +46,19 @@ pub fn run(args: RunArgs) -> Result<(), ExitCode> {
     let protocols = vec![
         CKBProtocol::new(
             "syn".to_string(),
-            NetworkProtocol::SYNC as ProtocolId,
+            ProtocolId::new(NetworkProtocol::SYNC as usize),
             &[1][..],
             Box::new(synchronizer),
         ),
         CKBProtocol::new(
             "rel".to_string(),
-            NetworkProtocol::RELAY as ProtocolId,
+            ProtocolId::new(NetworkProtocol::RELAY as usize),
             &[1][..],
             Box::new(relayer),
         ),
         CKBProtocol::new(
             "tim".to_string(),
-            NetworkProtocol::TIME as ProtocolId,
+            ProtocolId::new(NetworkProtocol::TIME as usize),
             &[1][..],
             Box::new(net_time_checker),
         ),

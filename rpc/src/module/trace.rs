@@ -56,7 +56,7 @@ impl<CS: ChainStore + 'static> TraceRpc for TraceRpcImpl<CS> {
                 fbb.finish(message, None);
 
                 self.network_controller.broadcast(
-                    NetworkProtocol::RELAY as ProtocolId,
+                    ProtocolId::new(NetworkProtocol::RELAY as usize),
                     fbb.finished_data().to_vec(),
                 );
                 Ok(tx_hash)

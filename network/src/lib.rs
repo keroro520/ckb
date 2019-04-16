@@ -36,7 +36,7 @@ pub use tokio;
 pub type MultiaddrList = Vec<(multiaddr::Multiaddr, u8)>;
 
 // basic protcol ids
-pub const PING_PROTOCOL_ID: ProtocolId = 0;
-pub const DISCOVERY_PROTOCOL_ID: ProtocolId = 1;
-pub const IDENTIFY_PROTOCOL_ID: ProtocolId = 2;
-pub const FEELER_PROTOCOL_ID: ProtocolId = 3;
+pub const PING_PROTOCOL_ID: ProtocolId = ProtocolId::new(0);
+pub const DISCOVERY_PROTOCOL_ID: ProtocolId = ProtocolId::new(1);
+pub const IDENTIFY_PROTOCOL_ID: ProtocolId = ProtocolId::new(2);
+pub const FEELER_PROTOCOL_ID: ProtocolId = ProtocolId::new(3);

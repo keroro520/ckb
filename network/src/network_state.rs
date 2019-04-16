@@ -297,7 +297,7 @@ impl NetworkState {
 
     pub fn dial(
         &self,
-        p2p_control: &mut ServiceControl,
+        p2p_control: &ServiceControl,
         peer_id: &PeerId,
         mut addr: Multiaddr,
         target: DialProtocol,
@@ -337,7 +337,7 @@ impl NetworkState {
     }
 
     /// Dial all protocol except feeler
-    pub fn dial_all(&self, p2p_control: &mut ServiceControl, peer_id: &PeerId, addr: Multiaddr) {
+    pub fn dial_all(&self, p2p_control: &ServiceControl, peer_id: &PeerId, addr: Multiaddr) {
         let ids = self.get_protocol_ids(|id| id != FEELER_PROTOCOL_ID);
         self.dial(p2p_control, peer_id, addr, DialProtocol::Multi(ids));
     }
