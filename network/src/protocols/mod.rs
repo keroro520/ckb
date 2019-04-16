@@ -160,28 +160,35 @@ impl<'a> CKBProtocolContext for DefaultCKBProtocolContext<'a> {
             .get_peer_id(session_id)
             .ok_or_else(|| PeerError::SessionNotFound(session_id))?;
 
-        let session_id = self
+        let (session_id, version) = self
             .network_state
             .peers_registry
             .get(&peer_id)
             .ok_or_else(|| PeerError::NotFound(peer_id.to_owned()))
             .and_then(|peer| {
-                peer.protocol_version(protocol_id)
-                    .ok_or_else(|| {
-                        warn!(target: "network", "can not get protocol version: peer={:?}, protocol_id={}", peer, protocol_id);
-                        PeerError::ProtocolNotFound(peer_id.to_owned(), protocol_id)
-                    })
-                    .map(|_| peer.session_id)
+                Ok((peer.session_id, peer.protocol_version(protocol_id)))
+                // Protocol timer event can send message, event the protocol not open
+                //peer.protocol_version(protocol_id)
+                //    .ok_or_else(|| {
+                //        warn!(target: "network", "can not get protocol version: peer={:?}, protocol_id={}", peer, protocol_id);
+                //        PeerError::ProtocolNotFound(peer_id.to_owned(), protocol_id)
+                //    })
+                //    .map(|_| peer.session_id)
             })?;
 
-        self.p2p_control
-            .send_message(session_id, protocol_id, data)
-            .map_err(|_| {
-                Error::P2P(format!(
-                    "error send to peer {:?} protocol {}",
-                    peer_id, protocol_id
-                ))
-            })
+        // dial peer only after protocol is open
+        if let Some(_) = version {
+            self.p2p_control
+                .send_message(session_id, protocol_id, data)
+                .map_err(|_| {
+                    Error::P2P(format!(
+                        "error send to peer {:?} protocol {}",
+                        peer_id, protocol_id
+                    ))
+                })
+        } else {
+            Ok(())
+        }
     }
     // report peer behaviour
     fn report_peer(&mut self, session_id: SessionId, behaviour: Behaviour) -> Result<(), Error> {
