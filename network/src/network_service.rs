@@ -163,7 +163,7 @@ impl NetworkService {
                 let controller = controller.clone();
                 move || {
                     let identify_callback = IdentifyCallback::new(controller.clone());
-                    ProtocolHandle::Both(Box::new(IdentifyProtocol::new(identify_callback)))
+                    ProtocolHandle::Callback(Box::new(IdentifyProtocol::new(identify_callback)))
                 }
             })
             .build();
