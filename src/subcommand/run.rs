@@ -10,7 +10,8 @@ use ckb_shared::shared::{Shared, SharedBuilder};
 use ckb_shared::store::ChainStore;
 use ckb_sync::{NetTimeProtocol, NetworkProtocol, Relayer, Synchronizer};
 use ckb_traits::chain_provider::ChainProvider;
-use log::info;
+use futures::future::Future;
+use log::{debug, info};
 
 pub fn run(args: RunArgs) -> Result<(), ExitCode> {
     deadlock_detection();
@@ -81,8 +82,11 @@ pub fn run(args: RunArgs) -> Result<(), ExitCode> {
 
     info!(target: "main", "Finishing work, please wait...");
     network_controller.shutdown();
-    network_runtime.shutdown_now();
     network_thread_handle.join().expect("wait network thread");
+    debug!(target: "network", "network thread exit");
+    if let Err(err) = network_runtime.shutdown_on_idle().wait() {
+        debug!(target: "network", "network shutdown error: {:?}", err);
+    }
     info!(target: "main", "Network shutdown");
 
     rpc_server.close();

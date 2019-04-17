@@ -280,7 +280,6 @@ impl NetworkService {
                 }
                 Err(err) => {
                     debug!(target: "network", "network stop signal dropped, error {:?}", err);
-                    network_state.drop_all(&mut self.p2p_control.clone());
                     return HandleResult::Stop(None);
                 }
             },
@@ -365,6 +364,9 @@ impl NetworkService {
                 HandleResult::Continue => {}
                 HandleResult::Stop(stop_waiter) => {
                     network_state.drop_all(&mut self.p2p_control.clone());
+                    if let Err(err) = self.p2p_control.shutdown() {
+                        warn!(target: "network", "send shutdown message to p2p error: {:?}", err);
+                    }
                     if let Some(stop_waiter) = stop_waiter {
                         if let Err(err) = stop_waiter.send(()) {
                             error!(target: "network", "failed to send stop_waiter: {:?}", err);
@@ -402,7 +404,8 @@ impl NetworkService {
             // forward p2p event to network service
             runtime.spawn(network_event_source.for_each(move |event| {
                 if let Err(err) = network_event_sender.send(event) {
-                    error!(target: "network", "forward network event error: {:?}", err);
+                    debug!(target: "network", "forward network event error: {:?}", err);
+                    return Err(());
                 }
                 Ok(())
             }));
@@ -410,7 +413,8 @@ impl NetworkService {
             // ping events
             runtime.spawn(ping_source.for_each(move |event| {
                 if let Err(err) = ping_sender.send(event) {
-                    error!(target: "network", "forward ping event error: {:?}", err);
+                    debug!(target: "network", "forward ping event error: {:?}", err);
+                    return Err(());
                 }
                 Ok(())
             }));
@@ -418,7 +422,8 @@ impl NetworkService {
             // disc events
             runtime.spawn(disc_source.for_each(move |event| {
                 if let Err(err) = disc_sender.send(event) {
-                    error!(target: "network", "forward disc event error: {:?}", err);
+                    debug!(target: "network", "forward disc event error: {:?}", err);
+                    return Err(());
                 }
                 Ok(())
             }));
@@ -428,7 +433,8 @@ impl NetworkService {
                 Interval::new_interval(outbound_interval)
                     .for_each(move |event| {
                         if let Err(err) = outbound_sender.send(event) {
-                            error!(target: "network", "forward outbound event error: {:?}", err);
+                            debug!(target: "network", "forward outbound event error: {:?}", err);
+                            return Err(tokio::timer::Error::shutdown());
                         }
                         Ok(())
                     })
