@@ -740,7 +740,6 @@ impl NetworkService {
                 data,
             } => {
                 if let Some(protocol) = self.find_protocol(proto_id) {
-                    println!("received {} {}", proto_id, data.len());
                     protocol.handler().received(
                         &mut DefaultCKBProtocolContext::new(proto_id, network_state, p2p_control),
                         session_context.id,
