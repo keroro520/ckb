@@ -556,16 +556,13 @@ impl NetworkService {
                     peer.ping = Some(duration);
                     peer.last_ping_time = Some(Instant::now());
                 }
-                network_state.report(&peer_id, Behaviour::Ping);
             }
             Timeout(peer_id) => {
                 debug!(target: "network", "timeout to ping {:?}", peer_id);
-                network_state.report(&peer_id, Behaviour::FailedToPing);
                 network_state.disconnect_peer(&peer_id);
             }
             UnexpectedError(peer_id) => {
                 debug!(target: "network", "failed to ping {:?}", peer_id);
-                network_state.report(&peer_id, Behaviour::FailedToPing);
                 network_state.disconnect_peer(&peer_id);
             }
         }

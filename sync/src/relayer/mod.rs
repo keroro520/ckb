@@ -137,7 +137,7 @@ impl<CS: ChainStore> Relayer<CS> {
         Ok(())
     }
 
-    fn process(&self, nc: &mut CKBProtocolContext, peer: PeerIndex, message: RelayMessage) {
+    fn process(&self, nc: &mut CKBProtocolContext, peer: SessionId, message: RelayMessage) {
         if let Err(err) = self.try_process(nc, peer, message) {
             info!(target: "relay", "relay process peer {:?} UnexpectedMessage error {:?}", peer, err);
             nc.ban_peer(peer, BAD_MESSAGE_BAN_TIME);

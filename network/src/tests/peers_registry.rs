@@ -2,7 +2,7 @@ use crate::{
     multiaddr::ToMultiaddr,
     peer_store::{PeerStore, SqlitePeerStore},
     peers_registry::{PeersRegistry, EVICTION_PROTECT_PEERS},
-    Behaviour, PeerId, SessionType,
+    Behaviour, PeerId, SessionType, SessionId
 };
 use std::time::{Duration, Instant};
 
@@ -82,7 +82,7 @@ fn test_accept_inbound_peer_eviction() {
     let lowest_score_peer = PeerId::random();
     let addr1 = "/ip4/127.0.0.1".to_multiaddr().unwrap();
     let addr2 = "/ip4/192.168.0.1".to_multiaddr().unwrap();
-    let session_id = 1;
+    let session_id = SessionId::new(1);
     let session_type = SessionType::Inbound;
     // prepare protected peers
     let longest_connection_time_peers_count = 5;
