@@ -37,6 +37,7 @@ use tokio::runtime::Runtime;
 use tokio::timer::Interval;
 
 const FEELER_CONNECTION_COUNT: u32 = 5;
+const FORWARD_CHANNEL_SIZE: usize = std::u8::MAX as usize;
 
 enum HandleResult {
     Continue,
@@ -198,11 +199,10 @@ impl NetworkService {
             .build(event_handler);
 
         // == build EventForward
-        let (network_event_sender, network_event_receiver) =
-            crossbeam_channel::bounded(DEFAULT_CHANNEL_SIZE);
-        let (ping_sender, ping_receiver) = crossbeam_channel::bounded(DEFAULT_CHANNEL_SIZE);
-        let (disc_sender, disc_receiver) = crossbeam_channel::bounded(DEFAULT_CHANNEL_SIZE);
-        let (outbound_sender, outbound_receiver) = crossbeam_channel::bounded(DEFAULT_CHANNEL_SIZE);
+        let (network_event_sender, network_event_receiver) = crossbeam_channel::unbounded();
+        let (ping_sender, ping_receiver) = crossbeam_channel::bounded(FORWARD_CHANNEL_SIZE);
+        let (disc_sender, disc_receiver) = crossbeam_channel::bounded(FORWARD_CHANNEL_SIZE);
+        let (outbound_sender, outbound_receiver) = crossbeam_channel::unbounded();
 
         let event_forward = EventForward {
             network_event_source: event_fut_receiver,

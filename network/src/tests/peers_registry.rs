@@ -2,7 +2,7 @@ use crate::{
     multiaddr::ToMultiaddr,
     peer_store::{PeerStore, SqlitePeerStore},
     peers_registry::{PeersRegistry, EVICTION_PROTECT_PEERS},
-    Behaviour, PeerId, SessionType, SessionId
+    Behaviour, PeerId, SessionId, SessionType,
 };
 use std::time::{Duration, Instant};
 
@@ -108,8 +108,12 @@ fn test_accept_inbound_peer_eviction() {
     {
         for _ in 0..EVICTION_PROTECT_PEERS {
             let peer_id = peers_iter.next().unwrap();
-            peers_registry.peer_store.report(&peer_id, Behaviour::TestGood);
-            peers_registry.peer_store.report(&peer_id, Behaviour::TestGood);
+            peers_registry
+                .peer_store
+                .report(&peer_id, Behaviour::TestGood);
+            peers_registry
+                .peer_store
+                .report(&peer_id, Behaviour::TestGood);
         }
     }
     // lowest ping peers
@@ -186,12 +190,24 @@ fn test_accept_inbound_peer_eviction() {
         .expect("accept");
     // setup score
     {
-        peers_registry.peer_store.report(&lowest_score_peer, Behaviour::TestBad);
-        peers_registry.peer_store.report(&lowest_score_peer, Behaviour::TestBad);
-        peers_registry.peer_store.report(&lowest_score_peer, Behaviour::TestBad);
-        peers_registry.peer_store.report(&reserved_peer, Behaviour::TestBad);
-        peers_registry.peer_store.report(&reserved_peer, Behaviour::TestBad);
-        peers_registry.peer_store.report(&evict_target, Behaviour::TestBad);
+        peers_registry
+            .peer_store
+            .report(&lowest_score_peer, Behaviour::TestBad);
+        peers_registry
+            .peer_store
+            .report(&lowest_score_peer, Behaviour::TestBad);
+        peers_registry
+            .peer_store
+            .report(&lowest_score_peer, Behaviour::TestBad);
+        peers_registry
+            .peer_store
+            .report(&reserved_peer, Behaviour::TestBad);
+        peers_registry
+            .peer_store
+            .report(&reserved_peer, Behaviour::TestBad);
+        peers_registry
+            .peer_store
+            .report(&evict_target, Behaviour::TestBad);
     }
     // make sure other peers should not protected by longest connection time rule
     new_peer_ids.extend_from_slice(&[
