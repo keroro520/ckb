@@ -224,11 +224,8 @@
     "method": "get_live_cell",
     "params": [
       {
-        "block_hash": null,
-        "cell": {
-          "index": "0",
-          "tx_hash": "0x00e47be2eeac34a22c4d7573bf2a65e531a5b78427ef5808c1b4971cf73418ac"
-        }
+        "index": "0",
+        "tx_hash": "0x00e47be2eeac34a22c4d7573bf2a65e531a5b78427ef5808c1b4971cf73418ac"
       }
     ],
     "result": {

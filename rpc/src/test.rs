@@ -250,7 +250,7 @@ fn test_rpc() {
         let actual = response
             .result
             .clone()
-            .expect("jsonrpc does not return result!");
+            .expect(format!("jsonrpc does not return result! response: {:?}", response).as_str());
         let expect = case.remove("result").expect("get case result");
 
         // Print only at print_mode, otherwise do real testing asserts

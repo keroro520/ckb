@@ -1,6 +1,6 @@
 use crate::error::RPCError;
 use ckb_core::cell::{CellProvider, CellStatus};
-use ckb_core::transaction::ProposalShortId;
+use ckb_core::transaction::{ProposalShortId, OutPoint as CoreOutPoint};
 use ckb_shared::shared::Shared;
 use ckb_store::ChainStore;
 use ckb_traits::ChainProvider;
@@ -11,7 +11,6 @@ use jsonrpc_types::{
     EpochExt, EpochNumber, HeaderView, OutPoint, TransactionWithStatus, Unsigned,
 };
 use numext_fixed_hash::H256;
-use std::convert::TryInto;
 
 pub const PAGE_SIZE: u64 = 100;
 
@@ -41,7 +40,7 @@ pub trait ChainRpc {
     ) -> Result<Vec<CellOutputWithOutPoint>>;
 
     #[rpc(name = "get_live_cell")]
-    fn get_live_cell(&self, _out_point: OutPoint) -> Result<CellWithStatus>;
+    fn get_live_cell(&self, _out_point: CellOutPoint) -> Result<CellWithStatus>;
 
     #[rpc(name = "get_tip_block_number")]
     fn get_tip_block_number(&self) -> Result<BlockNumber>;
@@ -184,13 +183,9 @@ impl<CS: ChainStore + 'static> ChainRpc for ChainRpcImpl<CS> {
         Ok(result)
     }
 
-    fn get_live_cell(&self, out_point: OutPoint) -> Result<CellWithStatus> {
-        let mut cell_status = self.shared.lock_chain_state().cell(
-            &(out_point
-                .clone()
-                .try_into()
-                .map_err(|_| Error::parse_error())?),
-        );
+    fn get_live_cell(&self, out_point: CellOutPoint) -> Result<CellWithStatus> {
+        let cell = CoreOutPoint::new_cell(out_point.tx_hash, out_point.index.0 as u32);
+        let mut cell_status = self.shared.lock_chain_state().cell(&cell);
         if let CellStatus::Live(ref mut cell_meta) = cell_status {
             if cell_meta.cell_output.is_none() {
                 cell_meta.cell_output = Some(

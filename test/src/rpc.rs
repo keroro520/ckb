@@ -1,7 +1,7 @@
 use jsonrpc_client_core::{expand_params, jsonrpc_client};
 use jsonrpc_types::{
     Block, BlockNumber, BlockTemplate, BlockView, CellOutputWithOutPoint, CellWithStatus,
-    ChainInfo, DryRunResult, EpochExt, EpochNumber, HeaderView, Node, OutPoint, PeerState,
+    ChainInfo, DryRunResult, EpochExt, EpochNumber, HeaderView, Node, CellOutPoint, PeerState,
     Transaction, TransactionWithStatus, TxPoolInfo, Unsigned, Version,
 };
 use numext_fixed_hash::H256;
@@ -18,7 +18,7 @@ jsonrpc_client!(pub struct RpcClient {
         _from: BlockNumber,
         _to: BlockNumber
     ) -> RpcRequest<Vec<CellOutputWithOutPoint>>;
-    pub fn get_live_cell(&mut self, _out_point: OutPoint) -> RpcRequest<CellWithStatus>;
+    pub fn get_live_cell(&mut self, _out_point: CellOutPoint) -> RpcRequest<CellWithStatus>;
     pub fn get_tip_block_number(&mut self) -> RpcRequest<BlockNumber>;
     pub fn get_current_epoch(&mut self) -> RpcRequest<EpochExt>;
     pub fn get_epoch_by_number(&mut self, number: EpochNumber) -> RpcRequest<Option<EpochExt>>;
