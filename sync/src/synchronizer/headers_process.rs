@@ -171,13 +171,12 @@ where
         if headers.len() == 0 {
             // Update peer's best known header
             self.synchronizer
-                .peers_manager
-                .best_known_headers
-                .write()
-                .insert(self.peer, best_known_header);
+                .peers_manager()
+                .set_best_known_header(self.peer, best_known_header);
+
             // Reset headers sync timeout
             self.synchronizer
-                .peers_manager
+                .peers_manager()
                 .state
                 .write()
                 .get_mut(&self.peer)
@@ -233,7 +232,10 @@ where
 
         if log_enabled!(target: "sync", log::Level::Debug) {
             let chain_state = self.synchronizer.shared.lock_chain_state();
-            let peer_state = self.synchronizer.peers_manager.best_known_header(self.peer);
+            let peer_state = self
+                .synchronizer
+                .peers_manager
+                .get_best_known_header(self.peer);
             debug!(
                 target: "sync",
                 "chain: num={}, diff={:#x};",
@@ -247,7 +249,7 @@ where
                 best_known_header.total_difficulty(),
                 best_known_header.hash(),
             );
-            if let Some(ref state) = peer_state {
+            if let Some(state) = peer_state {
                 debug!(
                     target: "sync",
                     "state: num={}; diff={:#x}, hash={:#x};",
