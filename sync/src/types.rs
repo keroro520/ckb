@@ -413,6 +413,7 @@ impl PeersManager {
     }
 
     pub fn disconnected(&self, peer: PeerIndex) {
+        self.state.write().remove(&peer);
         self.best_known_headers.write().remove(&peer);
         // self.misbehavior.write().remove(peer);
         self.blocks_inflight.write().remove_by_peer(&peer);
