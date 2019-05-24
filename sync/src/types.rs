@@ -209,7 +209,7 @@ impl KnownFilter {
 }
 
 #[derive(Default)]
-pub struct Peers {
+pub struct PeersManager {
     pub state: RwLock<FnvHashMap<PeerIndex, PeerState>>,
     pub misbehavior: RwLock<FnvHashMap<PeerIndex, u32>>,
     pub blocks_inflight: RwLock<InflightBlocks>,
@@ -356,7 +356,7 @@ impl InflightBlocks {
     }
 }
 
-impl Peers {
+impl PeersManager {
     pub fn misbehavior(&self, peer: PeerIndex, score: u32) {
         if score == 0 {
             return;

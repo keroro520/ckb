@@ -66,7 +66,9 @@ where
                 self.synchronizer.shared.tip_header().number(),
             );
 
-            self.synchronizer.peers.getheaders_received(self.peer);
+            self.synchronizer
+                .peers_manager
+                .getheaders_received(self.peer);
             let headers: Vec<Header> = self
                 .synchronizer
                 .shared

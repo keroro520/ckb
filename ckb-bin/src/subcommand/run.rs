@@ -64,7 +64,7 @@ pub fn run(args: RunArgs, version: Version) -> Result<(), ExitCode> {
     let relayer = Relayer::new(
         chain_controller.clone(),
         sync_shared_state,
-        synchronizer.peers(),
+        synchronizer.peers_manager(),
     );
     let net_timer = NetTimeProtocol::default();
 

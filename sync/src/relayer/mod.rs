@@ -23,7 +23,7 @@ use self::get_transaction_process::GetTransactionProcess;
 use self::transaction_hash_process::TransactionHashProcess;
 use self::transaction_process::TransactionProcess;
 use crate::relayer::compact_block::ShortTransactionID;
-use crate::types::{Peers, SyncSharedState};
+use crate::types::{PeersManager, SyncSharedState};
 use crate::BAD_MESSAGE_BAN_TIME;
 use ckb_chain::chain::ChainController;
 use ckb_core::block::{Block, BlockBuilder};
@@ -61,7 +61,7 @@ pub struct Relayer<CS> {
     pub(crate) shared: Arc<SyncSharedState<CS>>,
     pub(crate) state: Arc<RelayState>,
     // TODO refactor shared Peers struct with Synchronizer
-    peers: Arc<Peers>,
+    peers_manager: Arc<PeersManager>,
     pub(crate) tx_pool_executor: Arc<TxPoolExecutor<CS>>,
 }
 
@@ -71,7 +71,7 @@ impl<CS: ChainStore> Clone for Relayer<CS> {
             chain: self.chain.clone(),
             shared: Arc::clone(&self.shared),
             state: Arc::clone(&self.state),
-            peers: Arc::clone(&self.peers),
+            peers_manager: Arc::clone(&self.peers_manager),
             tx_pool_executor: Arc::clone(&self.tx_pool_executor),
         }
     }
@@ -81,14 +81,14 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
     pub fn new(
         chain: ChainController,
         shared: Arc<SyncSharedState<CS>>,
-        peers: Arc<Peers>,
+        peers_manager: Arc<PeersManager>,
     ) -> Self {
         let tx_pool_executor = Arc::new(TxPoolExecutor::new(shared.shared().clone()));
         Relayer {
             chain,
             shared,
             state: Arc::new(RelayState::default()),
-            peers,
+            peers_manager,
             tx_pool_executor,
         }
     }
@@ -224,7 +224,7 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
             fbb.finish(message, None);
             let data = fbb.finished_data().into();
 
-            let mut known_blocks = self.peers.known_blocks.lock();
+            let mut known_blocks = self.peers_manager.known_blocks.lock();
             let selected_peers: Vec<PeerIndex> = nc
                 .connected_peers()
                 .into_iter()
@@ -353,7 +353,7 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
 
     // Ask for relay transaction by hash from all peers
     pub fn ask_for_txs(&self, nc: &CKBProtocolContext) {
-        for (peer, peer_state) in self.peers.state.write().iter_mut() {
+        for (peer, peer_state) in self.peers_manager.state.write().iter_mut() {
             let tx_hashes = peer_state
                 .pop_ask_for_txs()
                 .into_iter()
@@ -384,8 +384,8 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
         }
     }
 
-    pub fn peers(&self) -> Arc<Peers> {
-        Arc::clone(&self.peers)
+    pub fn peers_manager(&self) -> Arc<PeersManager> {
+        Arc::clone(&self.peers_manager)
     }
 }
 

@@ -51,7 +51,7 @@ impl<CS: ChainStore + 'static> StatsRpc for StatsRpcImpl<CS> {
         // deprecated
         Ok(self
             .synchronizer
-            .peers()
+            .peers_manager()
             .blocks_inflight
             .read()
             .blocks_iter()

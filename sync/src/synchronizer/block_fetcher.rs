@@ -37,7 +37,7 @@ where
         }
     }
     pub fn reached_inflight_limit(&self) -> bool {
-        let inflight = self.synchronizer.peers.blocks_inflight.read();
+        let inflight = self.synchronizer.peers_manager.blocks_inflight.read();
 
         // Can't download any more from this peer
         inflight.peer_inflight_count(&self.peer) >= MAX_BLOCKS_IN_TRANSIT_PER_PEER
@@ -49,7 +49,7 @@ where
 
     pub fn peer_best_known_header(&self) -> Option<HeaderView> {
         self.synchronizer
-            .peers
+            .peers_manager
             .best_known_headers
             .read()
             .get(&self.peer)
@@ -57,7 +57,7 @@ where
     }
 
     pub fn last_common_header(&self, best: &HeaderView) -> Option<Header> {
-        let mut guard = self.synchronizer.peers.last_common_headers.write();
+        let mut guard = self.synchronizer.peers_manager.last_common_headers.write();
 
         let last_common_header = try_option!(guard.get(&self.peer).cloned().or_else(|| {
             if best.number() < self.tip_header.number() {
@@ -175,7 +175,7 @@ where
         let mut fetch = Vec::with_capacity(PER_FETCH_BLOCK_LIMIT);
 
         {
-            let mut inflight = self.synchronizer.peers.blocks_inflight.write();
+            let mut inflight = self.synchronizer.peers_manager.blocks_inflight.write();
             let count = MAX_BLOCKS_IN_TRANSIT_PER_PEER
                 .saturating_sub(inflight.peer_inflight_count(&self.peer));
 
