@@ -167,8 +167,8 @@ impl<CS: ChainStore> Synchronizer<CS> {
         }
     }
 
-    pub fn peers_manager(&self) -> Arc<PeersManager> {
-        Arc::clone(&self.peers_manager)
+    pub fn peers_manager(&self) -> &Arc<PeersManager> {
+        &self.peers_manager
     }
 
     pub fn insert_block_status(&self, hash: H256, status: BlockStatus) {
@@ -441,7 +441,9 @@ impl<CS: ChainStore> Synchronizer<CS> {
 
         for peer in peers {
             // Only sync with 1 peer if we're in IBD
-            if self.shared.is_initial_block_download() && self.n_sync_started.load(Ordering::Acquire) != 0 {
+            if self.shared.is_initial_block_download()
+                && self.n_sync_started.load(Ordering::Acquire) != 0
+            {
                 break;
             }
             {
