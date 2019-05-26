@@ -463,13 +463,13 @@ pub struct RelayState {
     // Proposal transactions that we have sent requests to peers for, but not got the response yet
     pub inflight_proposals: Mutex<FnvHashSet<ProposalShortId>>,
     // Transactions that we have sent requests to peers for, but not got the response yet.
-    pub tx_already_asked: Mutex<LruCache<H256, Instant>>,
+    pub inflight_transactions: Mutex<LruCache<H256, Instant>>,
     // Proposal transactions requested from peers, and we have not store locally yet.
     pub pending_proposals_request: Mutex<FnvHashMap<ProposalShortId, FnvHashSet<PeerIndex>>>,
     // CompactBlock filter for checking whether we have already known a block or not
     pub compact_block_filter: Mutex<Filter<H256>>,
     // Transaction Filter for checking whether we have already known a transaction or not
-    pub tx_filter: Mutex<Filter<H256>>,
+    pub transaction_filter: Mutex<Filter<H256>>,
 }
 
 impl Default for RelayState {
@@ -477,9 +477,9 @@ impl Default for RelayState {
         RelayState {
             pending_compact_blocks: Mutex::new(FnvHashMap::default()),
             inflight_proposals: Mutex::new(FnvHashSet::default()),
-            tx_already_asked: Mutex::new(LruCache::new(TX_ASKED_SIZE)),
+            inflight_transactions: Mutex::new(LruCache::new(TX_ASKED_SIZE)),
             pending_proposals_request: Mutex::new(FnvHashMap::default()),
-            tx_filter: Mutex::new(Filter::new(TX_FILTER_SIZE)),
+            transaction_filter: Mutex::new(Filter::new(TX_FILTER_SIZE)),
             compact_block_filter: Mutex::new(Filter::new(COMPACT_BLOCK_FILTER_SIZE)),
         }
     }
@@ -487,12 +487,12 @@ impl Default for RelayState {
 
 impl RelayState {
     fn already_known_tx(&self, hash: &H256) -> bool {
-        self.tx_filter.lock().contains(hash)
+        self.transaction_filter.lock().contains(hash)
     }
 
     fn mark_as_known_tx(&self, hash: H256) {
-        self.tx_already_asked.lock().remove(&hash);
-        self.tx_filter.lock().insert(hash);
+        self.inflight_transactions.lock().remove(&hash);
+        self.transaction_filter.lock().insert(hash);
     }
 
     fn already_known_compact_block(&self, hash: &H256) -> bool {
