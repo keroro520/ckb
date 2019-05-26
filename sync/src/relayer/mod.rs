@@ -54,7 +54,9 @@ pub const ASK_FOR_TXS_TOKEN: u64 = 1;
 pub const MAX_RELAY_PEERS: usize = 128;
 pub const TX_FILTER_SIZE: usize = 50000;
 pub const TX_ASKED_SIZE: usize = TX_FILTER_SIZE;
+pub const PENDING_PROPOSAL_REQUESTS_SIZE: usize = TX_ASKED_SIZE;
 pub const COMPACT_BLOCK_FILTER_SIZE: usize = 8192;
+pub const PENDING_COMPACT_BLOCKS_SIZE: usize = COMPACT_BLOCK_FILTER_SIZE;
 
 pub struct Relayer<CS> {
     chain: ChainController,
@@ -198,7 +200,7 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
             .proposals
             .iter()
             .chain(block.uncles.iter().flat_map(UncleBlock::proposals))
-            .filter(|x| !chain_state.contains_proposal_id(x) && inflight.insert(**x))
+            .filter(|x| !chain_state.contains_proposal_id(x) && inflight.insert(**x, ()))
             .cloned()
             .collect::<Vec<_>>();
 
@@ -321,13 +323,13 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
     }
 
     fn prune_tx_proposal_request(&self, nc: &CKBProtocolContext) {
-        let mut pending_proposals_request = self.state.pending_proposals_request.lock();
+        let mut pending_proposal_requests = self.state.pending_proposal_requests.lock();
         let mut peer_txs = FnvHashMap::default();
         let mut remove_ids = Vec::new();
         {
             let chain_state = self.shared.lock_chain_state();
             let tx_pool = chain_state.tx_pool();
-            for (id, peer_indexs) in pending_proposals_request.iter() {
+            for (id, peer_indexs) in pending_proposal_requests.iter() {
                 if let Some(tx) = tx_pool.get_tx(id) {
                     for peer_index in peer_indexs {
                         let tx_set = peer_txs.entry(*peer_index).or_insert_with(Vec::new);
@@ -339,7 +341,7 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
         }
 
         for id in remove_ids {
-            pending_proposals_request.remove(&id);
+            pending_proposal_requests.remove(&id);
         }
 
         for (peer_index, txs) in peer_txs {
@@ -459,13 +461,13 @@ pub struct RelayState {
     // CompactBlocks had received but not processed completely yet.
     // We are waiting for the corresponding missing transactions, once they arrived, we can process
     // the compact blocks
-    pub pending_compact_blocks: Mutex<FnvHashMap<H256, CompactBlock>>,
+    pub pending_compact_blocks: Mutex<LruCache<H256, CompactBlock>>,
+    // Proposal transactions requested from peers, and we have not store locally yet.
+    pub pending_proposal_requests: Mutex<LruCache<ProposalShortId, FnvHashSet<PeerIndex>>>,
     // Proposal transactions that we have sent requests to peers for, but not got the response yet
-    pub inflight_proposals: Mutex<FnvHashSet<ProposalShortId>>,
+    pub inflight_proposals: Mutex<LruCache<ProposalShortId, ()>>,
     // Transactions that we have sent requests to peers for, but not got the response yet.
     pub inflight_transactions: Mutex<LruCache<H256, Instant>>,
-    // Proposal transactions requested from peers, and we have not store locally yet.
-    pub pending_proposals_request: Mutex<FnvHashMap<ProposalShortId, FnvHashSet<PeerIndex>>>,
     // CompactBlock filter for checking whether we have already known a block or not
     pub compact_block_filter: Mutex<Filter<H256>>,
     // Transaction Filter for checking whether we have already known a transaction or not
@@ -475,10 +477,10 @@ pub struct RelayState {
 impl Default for RelayState {
     fn default() -> Self {
         RelayState {
-            pending_compact_blocks: Mutex::new(FnvHashMap::default()),
-            inflight_proposals: Mutex::new(FnvHashSet::default()),
+            pending_compact_blocks: Mutex::new(LruCache::new(PENDING_COMPACT_BLOCKS_SIZE)),
+            pending_proposal_requests: Mutex::new(LruCache::new(PENDING_PROPOSAL_REQUESTS_SIZE)),
+            inflight_proposals: Mutex::new(LruCache::new(TX_ASKED_SIZE)),
             inflight_transactions: Mutex::new(LruCache::new(TX_ASKED_SIZE)),
-            pending_proposals_request: Mutex::new(FnvHashMap::default()),
             transaction_filter: Mutex::new(Filter::new(TX_FILTER_SIZE)),
             compact_block_filter: Mutex::new(Filter::new(COMPACT_BLOCK_FILTER_SIZE)),
         }

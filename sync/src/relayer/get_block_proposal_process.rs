@@ -31,7 +31,7 @@ impl<'a, CS: ChainStore> GetBlockProposalProcess<'a, CS> {
     }
 
     pub fn execute(self) -> Result<(), FailureError> {
-        let mut pending_proposals_request = self.relayer.state.pending_proposals_request.lock();
+        let mut pending_proposals_request = self.relayer.state.pending_proposal_requests.lock();
         let proposals = cast!(self.message.proposals())?;
 
         let transactions = {
