@@ -11,8 +11,8 @@ use ckb_traits::{BlockMedianTimeContext, ChainProvider};
 use ckb_verification::{HeaderResolverWrapper, HeaderVerifier, Verifier};
 use failure::Error as FailureError;
 use flatbuffers::FlatBufferBuilder;
-use fnv::FnvHashMap;
 use log::debug;
+use lru_cache::LruCache;
 use numext_fixed_hash::H256;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -84,7 +84,7 @@ impl<'a, CS: ChainStore + 'static> CompactBlockProcess<'a, CS> {
         {
             // Verify compact block
             let mut pending_compact_blocks = self.relayer.state.pending_compact_blocks.lock();
-            if pending_compact_blocks.get(&block_hash).is_some()
+            if pending_compact_blocks.contains_key(&block_hash)
                 || self.relayer.shared.get_block(&block_hash).is_some()
             {
                 debug!(target: "relay", "already processed compact block {:x}", block_hash);
@@ -157,7 +157,7 @@ impl<'a, CS: ChainStore + 'static> CompactBlockProcess<'a, CS> {
 
 struct CompactBlockMedianTimeView<'a, CS> {
     anchor_hash: &'a H256,
-    pending_compact_blocks: &'a FnvHashMap<H256, CompactBlock>,
+    pending_compact_blocks: &'a LruCache<H256, CompactBlock>,
     shared: &'a Shared<CS>,
 }
 

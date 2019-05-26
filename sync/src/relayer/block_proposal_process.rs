@@ -54,7 +54,10 @@ impl<'a, CS: ChainStore + 'static> BlockProposalProcess<'a, CS> {
         let asked_txs = unknown_txs
             .into_iter()
             .filter_map(|(tx_hash, tx)| {
-                if inflight.remove(&ProposalShortId::from_tx_hash(&tx_hash)) {
+                if inflight
+                    .remove(&ProposalShortId::from_tx_hash(&tx_hash))
+                    .is_some()
+                {
                     // mark as known
                     self.relayer.state.mark_as_known_tx(tx_hash);
                     Some(tx)
