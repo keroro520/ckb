@@ -66,7 +66,7 @@ impl<'a, CS: ChainStore> TransactionHashProcess<'a, CS> {
             let last_ask_timeout = self
                 .relayer
                 .state
-                .tx_already_asked
+                .inflight_transactions
                 .lock()
                 .get(&tx_hash)
                 .cloned();
@@ -80,7 +80,7 @@ impl<'a, CS: ChainStore> TransactionHashProcess<'a, CS> {
             {
                 self.relayer
                     .state
-                    .tx_already_asked
+                    .inflight_transactions
                     .lock()
                     .insert(tx_hash.clone(), next_ask_timeout);
             }
