@@ -31,6 +31,11 @@ impl<'a, CS: ChainStore + 'static> BlockTransactionsProcess<'a, CS> {
 
     pub fn execute(self) -> Result<(), FailureError> {
         let block_hash = cast!(self.message.block_hash())?.try_into()?;
+
+        if self.relayer.state.already_known_compact_block(&block_hash) {
+            return Ok(());
+        }
+
         if let Some(compact_block) = self
             .relayer
             .state
