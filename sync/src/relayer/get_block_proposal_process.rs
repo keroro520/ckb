@@ -1,5 +1,5 @@
 use crate::relayer::Relayer;
-use ckb_core::transaction::ProposalShortId;
+use ckb_core::transaction::{ProposalShortId, Transaction};
 use ckb_network::{CKBProtocolContext, PeerIndex};
 use ckb_protocol::{cast, GetBlockProposal, RelayMessage};
 use ckb_store::ChainStore;
@@ -31,36 +31,44 @@ impl<'a, CS: ChainStore> GetBlockProposalProcess<'a, CS> {
     }
 
     pub fn execute(self) -> Result<(), FailureError> {
-        let mut pending_proposals_request = self.relayer.state.pending_proposal_requests.lock();
-        let proposals = cast!(self.message.proposals())?;
-
-        let transactions = {
-            let chain_state = self.relayer.shared.lock_chain_state();
-            let tx_pool = chain_state.tx_pool();
-
-            let proposals: Vec<ProposalShortId> = proposals
+        let proposals: Vec<ProposalShortId> = {
+            let proposals = cast!(self.message.proposals())?;
+            proposals
                 .iter()
                 .map(TryInto::try_into)
-                .collect::<Result<_, FailureError>>()?;
-
-            proposals
-                .into_iter()
-                .filter_map(|short_id| {
-                    tx_pool.get_tx(&short_id).or({
-                        pending_proposals_request
-                            .entry(short_id)
-                            .or_insert_with(Default::default)
-                            .insert(self.peer);
-                        None
-                    })
-                })
-                .collect::<Vec<_>>()
+                .collect::<Result<_, FailureError>>()?
         };
+        let pool_transactions: Vec<Option<Transaction>> = {
+            let chain_state = self.relayer.shared.lock_chain_state();
+            let tx_pool = chain_state.tx_pool();
+            proposals
+                .iter()
+                .map(|short_id| tx_pool.get_tx(short_id))
+                .collect()
+        };
+        let proposal_requests: Vec<(PeerIndex, ProposalShortId)> = proposals
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, short_id)| {
+                if pool_transactions[index].is_none() {
+                    Some((self.peer, short_id))
+                } else {
+                    None
+                }
+            })
+            .collect();
+        let transactions: Vec<Transaction> = pool_transactions
+            .into_iter()
+            .filter_map(|pool_transaction| pool_transaction)
+            .collect();
+
+        self.relayer
+            .state
+            .insert_pending_proposal_requests(proposal_requests);
 
         let fbb = &mut FlatBufferBuilder::new();
         let message = RelayMessage::build_block_proposal(fbb, &transactions);
         fbb.finish(message, None);
-
         self.nc
             .send_message_to(self.peer, fbb.finished_data().into());
         Ok(())

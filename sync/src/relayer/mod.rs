@@ -45,6 +45,8 @@ use log::{debug, info, trace};
 use lru_cache::LruCache;
 use numext_fixed_hash::H256;
 use std::collections::HashSet;
+use std::mem::swap;
+use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -195,15 +197,25 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
         peer: PeerIndex,
         block: &CompactBlock,
     ) {
-        let mut inflight = self.state.inflight_proposals.lock();
-        let unknown_ids = block
+        let proposals = block
             .proposals
             .iter()
-            .chain(block.uncles.iter().flat_map(UncleBlock::proposals))
-            .filter(|x| !chain_state.contains_proposal_id(x) && inflight.insert(**x, ()).is_none())
+            .chain(block.uncles.iter().flat_map(UncleBlock::proposals));
+        let unstored_ids: Vec<ProposalShortId> = proposals
+            .filter(|id| !chain_state.contains_proposal_id(id))
             .cloned()
-            .collect::<Vec<_>>();
-
+            .collect();
+        let inserts = self.state.insert_inflight_proposals(unstored_ids);
+        let unknown_ids: Vec<ProposalShortId> = inserts
+            .into_iter()
+            .filter_map(|(id, previously_in)| {
+                if previously_in.is_none() {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+            .collect();
         if !unknown_ids.is_empty() {
             let fbb = &mut FlatBufferBuilder::new();
             let message =
@@ -323,25 +335,21 @@ impl<CS: ChainStore + 'static> Relayer<CS> {
     }
 
     fn prune_tx_proposal_request(&self, nc: &CKBProtocolContext) {
-        let mut pending_proposal_requests = self.state.pending_proposal_requests.lock();
+        let pending_proposal_requests = self.state.take_pending_proposal_requests();
         let mut peer_txs = FnvHashMap::default();
-        let mut remove_ids = Vec::new();
         {
             let chain_state = self.shared.lock_chain_state();
             let tx_pool = chain_state.tx_pool();
-            for (id, peer_indexs) in pending_proposal_requests.iter() {
-                if let Some(tx) = tx_pool.get_tx(id) {
-                    for peer_index in peer_indexs {
-                        let tx_set = peer_txs.entry(*peer_index).or_insert_with(Vec::new);
-                        tx_set.push(tx.clone());
-                    }
+            for (id, peer_indices) in pending_proposal_requests.iter() {
+                if let Some(transaction) = tx_pool.get_tx(id) {
+                    peer_indices.iter().for_each(|peer| {
+                        peer_txs
+                            .entry(*peer)
+                            .or_insert_with(Vec::new)
+                            .push(transaction.clone());
+                    })
                 }
-                remove_ids.push(*id);
             }
-        }
-
-        for id in remove_ids {
-            pending_proposal_requests.remove(&id);
         }
 
         for (peer_index, txs) in peer_txs {
@@ -463,15 +471,15 @@ pub struct RelayState {
     // the compact blocks
     pub pending_compact_blocks: Mutex<LruCache<H256, CompactBlock>>,
     // Proposal transactions requested from peers, and we have not store locally yet.
-    pub pending_proposal_requests: Mutex<LruCache<ProposalShortId, FnvHashSet<PeerIndex>>>,
+    pending_proposal_requests: Mutex<LruCache<ProposalShortId, FnvHashSet<PeerIndex>>>,
     // Proposal transactions that we have sent requests to peers for, but not got the response yet
-    pub inflight_proposals: Mutex<LruCache<ProposalShortId, ()>>,
+    inflight_proposals: Mutex<LruCache<ProposalShortId, ()>>,
     // Transactions that we have sent requests to peers for, but not got the response yet.
-    pub inflight_transactions: Mutex<LruCache<H256, Instant>>,
+    inflight_transactions: Mutex<LruCache<H256, Instant>>,
     // CompactBlock filter for checking whether we have already known a block or not
-    pub compact_block_filter: Mutex<Filter<H256>>,
+    compact_block_filter: Mutex<Filter<H256>>,
     // Transaction Filter for checking whether we have already known a transaction or not
-    pub transaction_filter: Mutex<Filter<H256>>,
+    transaction_filter: Mutex<Filter<H256>>,
 }
 
 impl Default for RelayState {
@@ -503,5 +511,49 @@ impl RelayState {
 
     fn mark_as_known_compact_block(&self, hash: H256) {
         self.compact_block_filter.lock().insert(hash);
+    }
+
+    fn insert_pending_proposal_requests(&self, requests: Vec<(PeerIndex, ProposalShortId)>) {
+        let mut locked = self.pending_proposal_requests.lock();
+        requests.into_iter().for_each(|(peer_index, short_id)| {
+            locked
+                .entry(short_id)
+                .or_insert_with(Default::default)
+                .insert(peer_index);
+        });
+    }
+
+    fn take_pending_proposal_requests(&self) -> LruCache<ProposalShortId, FnvHashSet<PeerIndex>> {
+        let mut locked = self.pending_proposal_requests.lock();
+        let old = locked.deref_mut();
+        let mut new = LruCache::new(PENDING_PROPOSAL_REQUESTS_SIZE);
+        swap(old, &mut new);
+        new
+    }
+
+    fn get_inflight_transaction(&self, hash: &H256) -> Option<Instant> {
+        self.inflight_transactions.lock().get(hash).cloned()
+    }
+
+    fn insert_inflight_transaction(&self, hash: H256, instant: Instant) -> Option<Instant> {
+        self.inflight_transactions.lock().insert(hash, instant)
+    }
+
+    #[must_use]
+    fn insert_inflight_proposals(
+        &self,
+        proposal_ids: Vec<ProposalShortId>,
+    ) -> Vec<(ProposalShortId, Option<()>)> {
+        let mut locked = self.inflight_proposals.lock();
+        proposal_ids
+            .into_iter()
+            .map(|id| (id, locked.insert(id, ())))
+            .collect()
+    }
+
+    #[must_use]
+    fn remove_inflight_proposals(&self, proposal_ids: &[ProposalShortId]) -> Vec<Option<()>> {
+        let mut locked = self.inflight_proposals.lock();
+        proposal_ids.iter().map(|id| locked.remove(id)).collect()
     }
 }
