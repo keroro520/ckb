@@ -11,7 +11,6 @@ use ckb_traits::{BlockMedianTimeContext, ChainProvider};
 use ckb_verification::{HeaderResolverWrapper, HeaderVerifier, Verifier};
 use failure::Error as FailureError;
 use flatbuffers::FlatBufferBuilder;
-use fnv::FnvHashMap;
 use log::debug;
 use lru_cache::LruCache;
 use numext_fixed_hash::H256;

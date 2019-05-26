@@ -49,24 +49,24 @@ impl<'a, CS: ChainStore + 'static> BlockProposalProcess<'a, CS> {
         if unknown_txs.is_empty() {
             return Ok(());
         }
-        let mut inflight = self.relayer.state.inflight_proposals.lock();
-        // filter txs that we ask for download
-        let asked_txs = unknown_txs
-            .into_iter()
-            .filter_map(|(tx_hash, tx)| {
-                if inflight.remove(&ProposalShortId::from_tx_hash(&tx_hash)) {
-                    // mark as known
-                    self.relayer.state.mark_as_known_tx(tx_hash);
-                    Some(tx)
-                } else {
-                    None
-                }
-            })
+
+        let proposal_ids: Vec<ProposalShortId> = unknown_txs
+            .iter()
+            .map(|(tx_hash, _)| ProposalShortId::from_tx_hash(tx_hash))
             .collect();
+        let removes = self.relayer.state.remove_inflight_proposals(&proposal_ids);
+        let mut asked_transactions = Vec::with_capacity(proposal_ids.len());
+        for (previously_in, (tx_hash, transaction)) in removes.iter().zip(unknown_txs) {
+            if previously_in.is_some() {
+                self.relayer.state.mark_as_known_tx(tx_hash);
+                asked_transactions.push(transaction);
+            }
+        }
+
         self.nc.future_task({
             let tx_pool_executor = Arc::clone(&self.relayer.tx_pool_executor);
             Box::new(lazy(move || -> FutureResult<(), ()> {
-                let ret = tx_pool_executor.verify_and_add_txs_to_pool(asked_txs);
+                let ret = tx_pool_executor.verify_and_add_txs_to_pool(asked_transactions);
                 if ret.is_err() {
                     warn!(target: "relay", "BlockProposal add_tx_to_pool error {:?}", ret)
                 }
