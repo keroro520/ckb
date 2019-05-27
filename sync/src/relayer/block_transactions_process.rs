@@ -48,10 +48,16 @@ impl<'a, CS: ChainStore + 'static> BlockTransactionsProcess<'a, CS> {
                 self.relayer
                     .reconstruct_block(&chain_state, &compact_block, transactions)
             };
-
-            if let Ok(block) = ret {
-                self.relayer
-                    .accept_block(self.nc.as_ref(), self.peer, &Arc::new(block));
+            match ret {
+                Ok(block) => {
+                    self.relayer
+                        .accept_block(self.nc.as_ref(), self.peer, &Arc::new(block))
+                }
+                Err(err) => log::warn!(
+                    target: "sync",
+                    "failed to reconstruct compact block after receiving BlockTransactions: {:x} {:?}",
+                    block_hash, err,
+                ),
             }
         }
         Ok(())
