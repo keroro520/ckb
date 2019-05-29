@@ -43,14 +43,25 @@ impl<'a, CS: ChainStore + 'static> CompactBlockProcess<'a, CS> {
         let compact_block: CompactBlock = (*self.message).try_into()?;
         let block_hash = compact_block.header.hash().to_owned();
 
-        if let Some(parent_header_view) = self
+        let parent = self
             .relayer
             .shared
-            .get_header_view(&compact_block.header.parent_hash())
+            .get_header_view(compact_block.header.parent_hash());
+        if parent.is_none() {
+            debug!(target: "relay", "UnknownParent: {:#x}, send_getheaders_to_peer({})", block_hash, self.peer);
+            self.relayer.shared.send_getheaders_to_peer(
+                self.nc.as_ref(),
+                self.peer,
+                self.relayer.shared.lock_chain_state().tip_header(),
+            );
+            return Ok(());
+        }
+
         {
+            let parent = parent.unwrap();
             let best_known_header = self.relayer.shared.best_known_header();
             let current_total_difficulty =
-                parent_header_view.total_difficulty() + compact_block.header.difficulty();
+                parent.total_difficulty() + compact_block.header.difficulty();
             if current_total_difficulty <= *best_known_header.total_difficulty() {
                 debug!(
                     target: "relay",
@@ -61,13 +72,9 @@ impl<'a, CS: ChainStore + 'static> CompactBlockProcess<'a, CS> {
                 );
                 return Ok(());
             }
-        } else {
-            debug!(target: "relay", "UnknownParent: {:#x}, send_getheaders_to_peer({})", block_hash, self.peer);
-            self.relayer.shared.send_getheaders_to_peer(
-                self.nc.as_ref(),
-                self.peer,
-                self.relayer.shared.lock_chain_state().tip_header(),
-            );
+        }
+
+        if self.relayer.shared.get_block(&block_hash).is_some() {
             return Ok(());
         }
 
