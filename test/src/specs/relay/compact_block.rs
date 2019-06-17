@@ -193,6 +193,62 @@ impl CompactBlockBasic {
         node1.submit_block(&block);
         node1.waiting_for_sync(node0, node1.get_tip_block().header().number());
     }
+
+    pub fn test_parent_unstored(
+        &self,
+        net: &Net,
+        node0: &Node,
+        node1: &Node,
+        peer_id0: PeerIndex,
+    ) {
+        node0.generate_block();
+        let new_tx = node0.new_transaction(node0.get_tip_block().transactions()[0].hash().clone());
+        node0.submit_block(
+            &node0
+                .new_block_builder(None, None, None)
+                .proposal(new_tx.proposal_short_id())
+                .build(),
+        );
+        // Proposal a tx, and grow up into proposal window
+        node0.generate_blocks(6);
+
+        // Make node0 and node1 reach the same height
+        node1.generate_block();
+        node0.connect(node1);
+        node0.waiting_for_sync(node1, node0.get_tip_block().header().number());
+
+        // Net consume and ignore the recent blocks
+        clear_messages(net);
+
+        let parent = node0.new_block(None, None, None);
+        net.send(
+            NetworkProtocol::RELAY.into(),
+            peer_id0,
+            build_compact_block(&parent),
+        );
+        let _ = net
+            .receive_timeout(Duration::from_secs(10))
+            .expect("receive GetBlockTransactions");
+
+        // Construct a new block contains one transaction
+        let block = node0
+            .new_block_builder(None, None, None)
+            .transaction(new_tx)
+            .header_builder(
+                HeaderBuilder::from_header(parent.header().clone())
+                    .parent_hash(parent.header().parent_hash().clone())
+                    .number(parent.header().number() + 1)
+            )
+            .build();
+
+        // Net send the compact block to node0, but dose not send the corresponding missing
+        // block transactions. It will make node0 unable to reconstruct the complete block
+        net.send(
+            NetworkProtocol::RELAY.into(),
+            peer_id0,
+            build_compact_block_with_prefilled(&block, vec![0, 1, 2]),
+        );
+    }
 }
 
 impl Spec for CompactBlockBasic {
@@ -215,6 +271,7 @@ impl Spec for CompactBlockBasic {
         self.test_all_prefilled_compact_block(&net, &net.nodes[0], peer_ids[0]);
         self.test_missing_txs_compact_block(&net, &net.nodes[0], peer_ids[0]);
         self.test_lose_get_block_transactions(&net, &net.nodes[0], &net.nodes[1], peer_ids[0]);
+        self.test_parent_unstored(&net, &net.nodes[0], &net.nodes[1], peer_ids[0]);
     }
 
     fn test_protocols(&self) -> Vec<TestProtocol> {
