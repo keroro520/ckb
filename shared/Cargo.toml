@@ -19,11 +19,11 @@ lru-cache = { git = "https://github.com/nervosnetwork/lru-cache", rev = "a35fdb8
 faketime = "0.2"
 ckb-logger = { path = "../util/logger" }
 ckb-traits = { path = "../traits" }
-failure = "0.1.5"
 ckb-verification = { path = "../verification" }
 ckb-script = { path = "../script" }
 ckb-dao = { path = "../util/dao" }
 ckb-reward-calculator = { path = "../util/reward-calculator" }
+ckb-error = { path = "../error" }
 
 [dev-dependencies]
 env_logger = "0.6"

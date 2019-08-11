@@ -30,16 +30,16 @@ pub enum Misbehavior {
     #[fail(display = "CompactBlockError::IntersectedPrefilledTransactions")]
     IntersectedPrefilledTransactions,
     #[fail(
-        display = "block transactions' length is invalid, expect {}, but got {}",
-        expect, got
+        display = "InvalidBlockTransactionsLength{{expected: {}, actual: {}}}",
+        expected, got
     )]
-    InvalidBlockTransactionsLength { expect: usize, got: usize },
+    InvalidBlockTransactionsLength { expected: usize, got: usize },
     #[fail(
-        display = "block transactions' short id is invalid, expect {:#?}, but got {:#?}",
-        expect, got
+        display = "InvalidBlockTransactions{{expected: {:#?}, actual: {:#?}}}",
+        expected, got
     )]
     InvalidBlockTransactions {
-        expect: ProposalShortId,
+        expected: ProposalShortId,
         got: ProposalShortId,
     },
     #[fail(display = "BlockInvalid")]

@@ -1,6 +1,6 @@
 use crate::contextual_block_verifier::{UncleVerifierContext, VerifyContext};
-use crate::error::{Error, UnclesError};
 use crate::uncles_verifier::UnclesVerifier;
+use crate::UnclesError;
 use ckb_chain::chain::{ChainController, ChainService};
 use ckb_chain_spec::consensus::Consensus;
 use ckb_core::block::{Block, BlockBuilder};
@@ -12,6 +12,7 @@ use ckb_core::transaction::{
 };
 use ckb_core::uncle::uncles_hash;
 use ckb_core::{BlockNumber, Bytes};
+use ckb_error::assert_error_eq;
 use ckb_notify::NotifyService;
 use ckb_shared::shared::{Shared, SharedBuilder};
 use ckb_store::{ChainDB, ChainStore};
@@ -154,12 +155,15 @@ fn test_uncle_count() {
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
 
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::MissMatchCount {
-            expected: 0,
-            actual: 1
-        }))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(
+            UnclesError::UnmatchedCount {
+                expected: 0,
+                actual: 1,
+            }
+            .into(),
+        ),
     );
 }
 
@@ -181,12 +185,15 @@ fn test_invalid_uncle_hash_case1() {
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
 
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::InvalidHash {
-            expected: H256::zero(),
-            actual: block.cal_uncles_hash()
-        }))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(
+            UnclesError::UnmatchedUnclesHash {
+                expected: H256::zero(),
+                actual: block.cal_uncles_hash(),
+            }
+            .into(),
+        ),
     );
 }
 
@@ -212,12 +219,15 @@ fn test_invalid_uncle_hash_case2() {
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
 
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::InvalidHash {
-            expected: uncles_hash,
-            actual: H256::zero(),
-        }))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(
+            UnclesError::UnmatchedUnclesHash {
+                expected: uncles_hash,
+                actual: H256::zero(),
+            }
+            .into(),
+        ),
     );
 }
 
@@ -241,11 +251,9 @@ fn test_double_inclusion() {
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
 
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::DoubleInclusion(
-            block.uncles()[0].header().hash().to_owned()
-        )))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::DoubleInclusion(block.uncles()[0].header().hash().to_owned()).into()),
     );
 }
 
@@ -270,9 +278,9 @@ fn test_invalid_difficulty() {
 
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::InvalidDifficulty))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::UnmatchedDifficulty.into()),
     );
 }
 
@@ -303,9 +311,9 @@ fn test_invalid_epoch() {
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
 
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::InvalidDifficultyEpoch))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::UnmatchedEpochNumber.into()),
     );
 }
 
@@ -327,9 +335,9 @@ fn test_invalid_number() {
     let epoch = epoch(&shared, &chain2, 16);
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::InvalidNumber))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::UnmatchedBlockNumber.into()),
     );
 }
 
@@ -357,9 +365,9 @@ fn test_uncle_proposals_hash() {
     let epoch = epoch(&shared, &chain2, block_number);
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::ProposalsHash))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::UnmatchedProposalRoot.into()),
     );
 }
 
@@ -382,9 +390,9 @@ fn test_uncle_duplicated_proposals() {
     let epoch = epoch(&shared, &chain2, 7);
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::ProposalDuplicate))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::DuplicatedProposalTransactions.into()),
     );
 }
 
@@ -407,11 +415,9 @@ fn test_duplicated_uncles() {
     let epoch = epoch(&shared, &chain2, 11);
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::Duplicate(
-            block.uncles()[1].header().hash().to_owned()
-        )))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::DuplicatedUncles(block.uncles()[1].header().hash().to_owned()).into()),
     );
 }
 
@@ -438,12 +444,15 @@ fn test_uncle_over_count() {
     let epoch = epoch(&shared, &chain1, 11);
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::OverCount {
-            max: max_uncles_num as u32,
-            actual: max_uncles_num as u32 + 1
-        }))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(
+            UnclesError::TooManyUncles {
+                max: max_uncles_num as u32,
+                actual: max_uncles_num as u32 + 1,
+            }
+            .into(),
+        ),
     );
 }
 
@@ -470,9 +479,9 @@ fn test_exceeded_maximum_proposals_limit() {
     let epoch = epoch(&shared, &chain1, 7);
     let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
     let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-    assert_eq!(
-        verifier.verify(),
-        Err(Error::Uncles(UnclesError::ExceededMaximumProposalsLimit))
+    assert_error_eq(
+        verifier.verify().err(),
+        Some(UnclesError::TooManyProposals.into()),
     );
 }
 
@@ -493,9 +502,9 @@ fn test_descendant_limit() {
         let epoch = epoch(&shared, &chain2, 17);
         let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
         let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-        assert_eq!(
-            verifier.verify(),
-            Err(Error::Uncles(UnclesError::DescendantLimit))
+        assert_error_eq(
+            verifier.verify().err(),
+            Some(UnclesError::DescendantLimit.into()),
         );
     }
 
@@ -522,7 +531,7 @@ fn test_descendant_limit() {
         let epoch = epoch(&shared, &chain2, 17);
         let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
         let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-        assert_eq!(verifier.verify(), Ok(()));
+        assert!(verifier.verify().is_ok());
     }
 }
 
@@ -546,9 +555,9 @@ fn test_descendant_continuity() {
         let epoch = epoch(&shared, &chain2, 17);
         let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
         let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-        assert_eq!(
-            verifier.verify(),
-            Err(Error::Uncles(UnclesError::DescendantLimit))
+        assert_error_eq(
+            verifier.verify().err(),
+            Some(UnclesError::DescendantLimit.into()),
         );
     }
 }
@@ -573,7 +582,7 @@ fn test_ok() {
         let epoch = epoch(&shared, &chain2, 17);
         let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
         let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-        assert_eq!(verifier.verify(), Ok(()));
+        assert!(verifier.verify().is_ok());
     }
 
     {
@@ -588,7 +597,7 @@ fn test_ok() {
         let epoch = epoch(&shared, &chain1, 11);
         let uncle_verifier_context = UncleVerifierContext::new(&dummy_context, &epoch);
         let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-        assert_eq!(verifier.verify(), Ok(()));
+        assert!(verifier.verify().is_ok());
     }
 }
 
@@ -617,8 +626,8 @@ fn test_ok() {
 //         let uncle_verifier_context = UncleVerifierContext::new(&context, &epoch, &block);
 //         let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
 //         assert_eq!(
-//             verifier.verify(),
-//             Err(Error::Uncles(UnclesError::DoubleInclusion(
+//             verifier.verify().err(),
+//             Some(UnclesError::DoubleInclusion(
 //                 block.uncles()[0].header().hash().to_owned()
 //             )))
 //         );
@@ -638,6 +647,6 @@ fn test_ok() {
 
 //         let uncle_verifier_context = UncleVerifierContext::new(&context, &epoch, &block);
 //         let verifier = UnclesVerifier::new(uncle_verifier_context, &block);
-//         assert_eq!(verifier.verify(), Ok(()));
+//         assert_eq!(verifier.verify().err(), Ok(()));
 //     }
 // }

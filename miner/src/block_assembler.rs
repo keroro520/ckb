@@ -452,7 +452,7 @@ impl BlockAssembler {
         let occupied_capacity = output.occupied_capacity(Capacity::bytes(data.len())?)?;
 
         if reward < occupied_capacity {
-            return Err(TransactionError::InsufficientCellCapacity.into());
+            Err(TransactionError::OccupiedOverflowCapacity)?;
         }
 
         if !data.is_empty() {

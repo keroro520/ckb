@@ -4,11 +4,13 @@ use crate::MAX_HEADERS_LEN;
 use ckb_core::extras::EpochExt;
 use ckb_core::header::Header;
 use ckb_core::BlockNumber;
+use ckb_error::Error;
 use ckb_logger::{debug, log_enabled, warn, Level};
 use ckb_network::{CKBProtocolContext, PeerIndex};
 use ckb_protocol::{cast, FlatbuffersVectorIterator, Headers};
 use ckb_traits::BlockMedianTimeContext;
-use ckb_verification::{Error as VerifyError, HeaderResolver, HeaderVerifier, Verifier};
+use ckb_verification::{HeaderError, HeaderErrorKind};
+use ckb_verification::{HeaderResolver, HeaderVerifier, Verifier};
 use failure::Error as FailureError;
 use numext_fixed_hash::H256;
 use std::convert::TryInto;
@@ -347,34 +349,22 @@ where
     }
 
     pub fn non_contextual_check(&self, state: &mut ValidationResult) -> Result<(), ()> {
-        self.verifier
-            .verify(&self.resolver)
-            .map_err(|error| match error {
-                VerifyError::Pow(e) => {
-                    debug!(
-                        "HeadersProcess accept {:?} pow error {:?}",
-                        self.header.number(),
-                        e
-                    );
-                    state.dos(Some(ValidationError::Verify(VerifyError::Pow(e))), 100);
-                }
-                VerifyError::Epoch(e) => {
-                    debug!(
-                        "HeadersProcess accept {:?} epoch error {:?}",
-                        self.header.number(),
-                        e
-                    );
-                    state.dos(Some(ValidationError::Verify(VerifyError::Epoch(e))), 50);
-                }
-                error => {
-                    debug!(
-                        "HeadersProcess accept {:?} {:?}",
-                        self.header.number(),
-                        error
-                    );
-                    state.invalid(Some(ValidationError::Verify(error)));
-                }
-            })
+        self.verifier.verify(&self.resolver).map_err(|error| {
+            debug!(
+                "HeadersProcess accept {:?} error {:?}",
+                self.header.number(),
+                error
+            );
+            match TryInto::<&HeaderError>::try_into(&error) {
+                Ok(header_error) => match header_error.kind() {
+                    HeaderErrorKind::Pow | HeaderErrorKind::Epoch => {
+                        state.dos(Some(ValidationError::Verify(error)), 100)
+                    }
+                    _ => state.invalid(Some(ValidationError::Verify(error))),
+                },
+                Err(_) => state.invalid(Some(ValidationError::Verify(error))),
+            }
+        })
     }
 
     pub fn version_check(&self, state: &mut ValidationResult) -> Result<(), ()> {
@@ -474,7 +464,7 @@ impl Default for ValidationState {
 
 #[derive(Debug)]
 pub enum ValidationError {
-    Verify(VerifyError),
+    Verify(Error),
     Version,
     InvalidParent,
 }

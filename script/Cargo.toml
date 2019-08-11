@@ -19,6 +19,8 @@ ckb-logger = { path = "../util/logger" }
 ckb-protocol = { path = "../protocol" }
 serde = "1.0"
 serde_derive = "1.0"
+ckb-error = { path = "../error" }
+failure = "0.1.5"
 
 [dev-dependencies]
 proptest = "0.9"

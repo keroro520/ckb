@@ -1,12 +1,12 @@
-use crate::error::{CellbaseError, Error};
 use crate::header_verifier::HeaderResolver;
-use crate::Verifier;
+use crate::{BlockErrorKind, CellbaseError, Verifier};
 use ckb_chain_spec::consensus::Consensus;
 use ckb_core::block::Block;
 use ckb_core::extras::EpochExt;
 use ckb_core::header::Header;
 use ckb_core::script::Script;
 use ckb_core::transaction::CellInput;
+use ckb_error::Error;
 use ckb_store::ChainStore;
 use ckb_traits::ChainProvider;
 use std::collections::HashSet;
@@ -66,13 +66,13 @@ impl CellbaseVerifier {
 
         // empty checked, block must contain cellbase
         if cellbase_len != 1 {
-            return Err(Error::Cellbase(CellbaseError::InvalidQuantity));
+            Err(CellbaseError::InvalidQuantity)?;
         }
 
         let cellbase_transaction = &block.transactions()[0];
 
         if !cellbase_transaction.is_cellbase() {
-            return Err(Error::Cellbase(CellbaseError::InvalidPosition));
+            Err(CellbaseError::InvalidPosition)?;
         }
 
         if cellbase_transaction
@@ -81,7 +81,7 @@ impl CellbaseVerifier {
             .and_then(|witness| Script::from_witness(witness))
             .is_none()
         {
-            return Err(Error::Cellbase(CellbaseError::InvalidWitness));
+            Err(CellbaseError::InvalidWitness)?;
         }
 
         if cellbase_transaction
@@ -89,12 +89,12 @@ impl CellbaseVerifier {
             .iter()
             .any(|output| output.type_.is_some())
         {
-            return Err(Error::Cellbase(CellbaseError::InvalidTypeScript));
+            Err(CellbaseError::InvalidTypeScript)?;
         }
 
         let cellbase_input = &cellbase_transaction.inputs()[0];
         if cellbase_input != &CellInput::new_cellbase_input(block.header().number()) {
-            return Err(Error::Cellbase(CellbaseError::InvalidInput));
+            Err(CellbaseError::InvalidInput)?;
         }
 
         Ok(())
@@ -112,12 +112,12 @@ impl DuplicateVerifier {
     pub fn verify(&self, block: &Block) -> Result<(), Error> {
         let mut seen = HashSet::with_capacity(block.transactions().len());
         if !block.transactions().iter().all(|tx| seen.insert(tx.hash())) {
-            return Err(Error::CommitTransactionDuplicate);
+            Err(BlockErrorKind::DuplicatedCommittedTransactions)?;
         }
 
         let mut seen = HashSet::with_capacity(block.proposals().len());
         if !block.proposals().iter().all(|id| seen.insert(id)) {
-            return Err(Error::ProposalTransactionDuplicate);
+            Err(BlockErrorKind::DuplicatedProposalTransactions)?;
         }
         Ok(())
     }
@@ -133,15 +133,15 @@ impl MerkleRootVerifier {
 
     pub fn verify(&self, block: &Block) -> Result<(), Error> {
         if block.header().transactions_root() != &block.cal_transactions_root() {
-            return Err(Error::CommitTransactionsRoot);
+            Err(BlockErrorKind::UnmatchedCommittedRoot)?;
         }
 
         if block.header().witnesses_root() != &block.cal_witnesses_root() {
-            return Err(Error::WitnessesMerkleRoot);
+            Err(BlockErrorKind::UnmatchedWitnessesRoot)?;
         }
 
         if block.header().proposals_hash() != &block.cal_proposals_hash() {
-            return Err(Error::ProposalTransactionsRoot);
+            Err(BlockErrorKind::UnmatchedProposalRoot)?;
         }
 
         Ok(())
@@ -220,7 +220,7 @@ impl BlockProposalsLimitVerifier {
         if proposals_len <= self.block_proposals_limit {
             Ok(())
         } else {
-            Err(Error::ExceededMaximumProposalsLimit)
+            Err(BlockErrorKind::TooManyProposals)?
         }
     }
 }
@@ -248,7 +248,7 @@ impl BlockBytesVerifier {
         if block_bytes <= self.block_bytes_limit {
             Ok(())
         } else {
-            Err(Error::ExceededMaximumBlockBytes)
+            Err(BlockErrorKind::TooLargeSize)?
         }
     }
 }

@@ -6,6 +6,7 @@ pub mod alert;
 pub mod block;
 pub mod cell;
 pub mod difficulty;
+pub mod error;
 pub mod extras;
 pub mod header;
 pub mod reward;
