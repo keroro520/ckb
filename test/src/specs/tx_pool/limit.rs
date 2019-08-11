@@ -1,4 +1,5 @@
-use crate::{assert_regex_match, Net, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
+use crate::utils::assert_send_transaction_fail;
+use crate::{Net, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
 use ckb_app_config::CKBAppConfig;
 use log::info;
 
@@ -27,12 +28,7 @@ impl Spec for SizeLimit {
 
         info!("No.6 tx reach size limit");
         let tx = node.new_transaction(hash.clone());
-
-        let error = node
-            .rpc_client()
-            .send_transaction_result(tx.data().into())
-            .unwrap_err();
-        assert_regex_match(&error.to_string(), r"LimitReached");
+        assert_send_transaction_fail(node, &tx, "FullTransactionPool");
 
         // 298 * 5
         // 12 * 5
@@ -77,12 +73,7 @@ impl Spec for CyclesLimit {
 
         info!("No.6 tx reach cycles limit");
         let tx = node.new_transaction(hash.clone());
-
-        let error = node
-            .rpc_client()
-            .send_transaction_result(tx.data().into())
-            .unwrap_err();
-        assert_regex_match(&error.to_string(), r"LimitReached");
+        assert_send_transaction_fail(node, &tx, "FullTransactionPool");
 
         // 298 * 5
         // 12 * 5

@@ -7,7 +7,7 @@ use crate::{
 };
 use ckb_db::{
     iter::{DBIterator, DBIteratorItem},
-    Col, DBVector, Direction, Error, RocksDBTransaction, RocksDBTransactionSnapshot,
+    Col, DBVector, Direction, RocksDBTransaction, RocksDBTransactionSnapshot,
 };
 use ckb_types::{
     core::{
@@ -17,6 +17,8 @@ use ckb_types::{
     packed,
     prelude::*,
 };
+use ckb_error::Error;
+use ckb_protos::{self as protos, CanBuild};
 
 pub struct StoreTransaction {
     pub(crate) inner: RocksDBTransaction,
