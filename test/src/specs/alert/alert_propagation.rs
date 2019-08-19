@@ -53,7 +53,7 @@ impl Spec for AlertPropagation {
             .map(|s| Bytes::from(s.serialize()))
             .collect();
         // send alert
-        node0.rpc_client().send_alert(alert.clone().into());
+        node0.rpc_client().send_alert(alert.clone());
         info!("Waiting for alert relay");
         let ret = wait_until(20, || {
             net.nodes
@@ -86,7 +86,7 @@ impl Spec for AlertPropagation {
             .iter()
             .map(|s| Bytes::from(s.serialize()))
             .collect();
-        node0.rpc_client().send_alert(alert2.into());
+        node0.rpc_client().send_alert(alert2);
         info!("Waiting for alert relay");
         let ret = wait_until(20, || {
             net.nodes.iter().all(|node| {
@@ -105,7 +105,7 @@ impl Spec for AlertPropagation {
         }
 
         // send canceled alert again, should ignore by all nodes
-        node0.rpc_client().send_alert(alert.into());
+        node0.rpc_client().send_alert(alert);
         let alerts = node0.rpc_client().get_blockchain_info().alerts;
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].message, warning2);

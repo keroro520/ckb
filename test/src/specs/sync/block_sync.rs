@@ -37,7 +37,7 @@ impl Spec for BlockSyncFromOne {
         let ret = wait_until(10, || {
             let header0 = rpc_client0.get_tip_header();
             let header1 = rpc_client1.get_tip_header();
-            header0 == header1 && header0.inner.number.0 == 3
+            header0 == header1 && header0.number() == 3
         });
         assert!(
             ret,
@@ -71,8 +71,8 @@ impl Spec for BlockSyncForks {
         let info1: ChainInfo = rpc_client1.get_blockchain_info();
         let tip0 = rpc_client0.get_tip_header();
         let tip1 = rpc_client1.get_tip_header();
-        assert_eq!(tip0.inner.number, tip1.inner.number);
-        assert_ne!(tip0.hash, tip1.hash);
+        assert_eq!(tip0.number(), tip1.number());
+        assert_ne!(tip0.hash(), tip1.hash());
 
         // Connect node0 and node1, so that they can sync with each other
         node0.connect(node1);
@@ -85,7 +85,7 @@ impl Spec for BlockSyncForks {
             ret,
             "Node0 and node1 should sync with each other until same tip chain",
         );
-        for number in 1u64..tip0.inner.number.0 {
+        for number in 1u64..tip0.number() {
             let block0 = rpc_client0.get_block_by_number(number);
             let block1 = rpc_client1.get_block_by_number(number);
             assert_eq!(
@@ -176,7 +176,7 @@ impl Spec for BlockSyncDuplicatedAndReconnect {
         // Sync corresponding block entity, `node` should accept the block as tip block
         sync_block(&net, peer_id, &block);
         let hash = block.header().hash().clone();
-        wait_until(10, || rpc_client.get_tip_header().hash == hash);
+        wait_until(10, || rpc_client.get_tip_header().hash() == &hash);
     }
 }
 

@@ -46,7 +46,7 @@ impl Spec for IndexerBasic {
 
         (0..5).for_each(|_| {
             let tx = node0.new_transaction(hash.clone());
-            hash = rpc_client.send_transaction((&tx).into());
+            hash = rpc_client.send_transaction(&tx);
             txs_hash.push(hash.clone());
         });
 
@@ -70,9 +70,9 @@ impl Spec for IndexerBasic {
             rpc_client.get_live_cells_by_lock_hash(lock_hash.clone(), 0, 20, Some(true));
         let cell_transactions =
             rpc_client.get_transactions_by_lock_hash(lock_hash.clone(), 0, 20, Some(true));
-        let tip_number = rpc_client.get_tip_header().inner.number;
-        assert_eq!(tip_number, live_cells[0].created_by.block_number);
-        assert_eq!(tip_number, cell_transactions[0].created_by.block_number);
+        let tip_number = rpc_client.get_tip_header().number();
+        assert_eq!(tip_number, live_cells[0].created_by.block_number.0);
+        assert_eq!(tip_number, cell_transactions[0].created_by.block_number.0);
 
         info!("Generate 5 blocks on node1 and connect node0 to switch fork");
         node1.generate_blocks(5);
@@ -100,7 +100,7 @@ impl Spec for IndexerBasic {
         info!("The block number and hash of index status should be same as tip when gives a higher index from");
         let index_state = rpc_client.index_lock_hash(lock_hash.clone(), Some(100));
         let tip_header = rpc_client.get_tip_header();
-        assert_eq!(index_state.block_number, tip_header.inner.number);
-        assert_eq!(index_state.block_hash, tip_header.hash);
+        assert_eq!(index_state.block_number.0, tip_header.number());
+        assert_eq!(&index_state.block_hash, tip_header.hash());
     }
 }

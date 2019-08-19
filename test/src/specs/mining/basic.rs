@@ -1,10 +1,8 @@
 use crate::{Net, Node, Spec};
-use ckb_core::block::Block;
 use ckb_core::header::HeaderBuilder;
 use ckb_core::transaction::ProposalShortId;
 use ckb_jsonrpc_types::BlockTemplate;
 use log::info;
-use std::convert::Into;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -32,8 +30,8 @@ impl MiningBasic {
         let _ = node.generate_block(); // skip
         let block3_hash = node.generate_block();
 
-        let block1: Block = node.rpc_client().get_block(block1_hash).unwrap().into();
-        let block3: Block = node.rpc_client().get_block(block3_hash).unwrap().into();
+        let block1 = node.rpc_client().get_block(block1_hash).unwrap();
+        let block3 = node.rpc_client().get_block(block3_hash).unwrap();
 
         info!("Generated tx should be included in next block's proposal txs");
         assert!(block1
@@ -69,7 +67,7 @@ impl MiningBasic {
         let rpc_client = node.rpc_client();
         let block_hash1 = block1.header().hash().clone();
         assert_eq!(block_hash1, node.submit_block(&block1));
-        assert_eq!(block_hash1, rpc_client.get_tip_header().hash);
+        assert_eq!(&block_hash1, rpc_client.get_tip_header().hash());
 
         let template1 = rpc_client.get_block_template(None, None, None);
         sleep(Duration::new(0, 200));
@@ -82,7 +80,7 @@ impl MiningBasic {
 
         let block_hash2 = block2.header().hash().clone();
         assert_eq!(block_hash2, node.submit_block(&block2));
-        assert_eq!(block_hash2, rpc_client.get_tip_header().hash);
+        assert_eq!(&block_hash2, rpc_client.get_tip_header().hash());
         let template3 = rpc_client.get_block_template(None, None, None);
         assert_eq!(block_hash2, template3.parent_hash);
         assert!(

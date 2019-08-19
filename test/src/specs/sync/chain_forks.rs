@@ -240,7 +240,7 @@ impl Spec for ChainFork5 {
         node0.generate_blocks(1);
         info!("Generate 1 block (B) on node0, proposal spent A cellbase transaction");
         let transaction = node0.new_transaction_spend_tip_cellbase();
-        node0.submit_transaction(&transaction);
+        node0.send_transaction(&transaction);
         node0.generate_blocks(1);
         info!("Connect all nodes");
         node1.connect(node0);

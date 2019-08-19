@@ -1,7 +1,6 @@
 use crate::{Net, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
 use ckb_app_config::{BlockAssemblerConfig, CKBAppConfig};
 use ckb_chain_spec::ChainSpec;
-use ckb_core::block::Block;
 use ckb_core::script::{Script as CoreScript, ScriptHashType};
 use ckb_core::Bytes;
 use ckb_jsonrpc_types::JsonBytes;
@@ -32,11 +31,7 @@ impl Spec for BootstrapCellbase {
         };
 
         let is_bootstrap_cellbase = |blk_hash: &H256| {
-            let blk: Block = node
-                .rpc_client()
-                .get_block(blk_hash.clone())
-                .unwrap()
-                .into();
+            let blk = node.rpc_client().get_block(blk_hash.clone()).unwrap();
             blk.transactions()[0].is_cellbase()
                 && blk.transactions()[0].outputs()[0].lock == bootstrap_lock
         };
@@ -45,7 +40,7 @@ impl Spec for BootstrapCellbase {
 
         let hash = node.generate_block();
 
-        let blk: Block = node.rpc_client().get_block(hash).unwrap().into();
+        let blk = node.rpc_client().get_block(hash).unwrap();
         assert!(
             blk.transactions()[0].is_cellbase()
                 && blk.transactions()[0].outputs()[0].lock == miner

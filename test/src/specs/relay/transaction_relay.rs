@@ -70,7 +70,7 @@ impl Spec for TransactionRelayMultiple {
             tb = tb.output(output.clone());
         }
         let transaction = tb.build();
-        node0.rpc_client().send_transaction((&transaction).into());
+        node0.rpc_client().send_transaction(&transaction);
         node0.generate_block();
         node0.generate_block();
         node0.generate_block();
@@ -88,7 +88,7 @@ impl Spec for TransactionRelayMultiple {
                     .output(output.clone())
                     .input(CellInput::new(OutPoint::new(tx_hash.clone(), i as u32), 0))
                     .build();
-                node0.rpc_client().send_transaction((&tx).into());
+                node0.rpc_client().send_transaction(&tx);
             });
 
         node0.generate_block();

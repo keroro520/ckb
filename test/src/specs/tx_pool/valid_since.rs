@@ -127,10 +127,8 @@ impl ValidSince {
                 node.rpc_client()
                     .get_block_by_number(block_number)
                     .unwrap()
-                    .header
-                    .inner
-                    .timestamp
-                    .0
+                    .header()
+                    .timestamp()
             })
             .collect();
         timestamps.sort();
@@ -172,10 +170,8 @@ impl ValidSince {
                 node.rpc_client()
                     .get_block_by_number(block_number)
                     .unwrap()
-                    .header
-                    .inner
-                    .timestamp
-                    .0
+                    .header()
+                    .timestamp()
             })
             .collect();
         timestamps.sort();
@@ -216,7 +212,7 @@ impl ValidSince {
 
         (0..relative_blocks - DEFAULT_TX_PROPOSAL_WINDOW.0).for_each(|i| {
             info!("Tx is immature in block N + {}", i);
-            let error = node.rpc_client().send_transaction((&tx).into());
+            let error = node.rpc_client().send_transaction(&tx);
             assert_regex_match(&error.to_string(), r"InvalidTx\(Immature\)");
             node.generate_block();
         });
@@ -225,7 +221,7 @@ impl ValidSince {
             "Tx will be added to pending pool in N + {} block",
             relative_blocks - DEFAULT_TX_PROPOSAL_WINDOW.0
         );
-        let tx_hash = node.rpc_client().send_transaction((&tx).into());
+        let tx_hash = node.rpc_client().send_transaction(&tx);
         assert_eq!(tx_hash, tx.hash().to_owned());
         node.assert_tx_pool_size(1, 0);
 
@@ -255,7 +251,7 @@ impl ValidSince {
 
         (tip_number..absolute_block - DEFAULT_TX_PROPOSAL_WINDOW.0).for_each(|i| {
             info!("Tx is immature in block {}", i);
-            let error = node.rpc_client().send_transaction((&tx).into());
+            let error = node.rpc_client().send_transaction(&tx);
             assert_regex_match(&error.to_string(), r"InvalidTx\(Immature\)");
             node.generate_block();
         });
@@ -264,7 +260,7 @@ impl ValidSince {
             "Tx will be added to pending pool in {} block",
             absolute_block - DEFAULT_TX_PROPOSAL_WINDOW.0
         );
-        let tx_hash = node.rpc_client().send_transaction((&tx).into());
+        let tx_hash = node.rpc_client().send_transaction(&tx);
         assert_eq!(tx_hash, tx.hash().to_owned());
         node.assert_tx_pool_size(1, 0);
 

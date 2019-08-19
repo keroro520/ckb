@@ -230,13 +230,13 @@ impl Node {
 
     pub fn submit_block(&self, block: &Block) -> H256 {
         self.rpc_client()
-            .submit_block("".to_owned(), block.into())
+            .submit_block("".to_owned(), block)
             .expect("submit_block result none")
     }
 
     pub fn process_block_without_verify(&self, block: &Block) -> H256 {
         self.rpc_client()
-            .process_block_without_verify(block.into())
+            .process_block_without_verify(block)
             .expect("process_block_without_verify result none")
     }
 
@@ -251,7 +251,7 @@ impl Node {
 
     // generate a transaction which spend tip block's cellbase and send it to pool through rpc.
     pub fn generate_transaction(&self) -> H256 {
-        self.submit_transaction(&self.new_transaction_spend_tip_cellbase())
+        self.send_transaction(&self.new_transaction_spend_tip_cellbase())
     }
 
     // generate a transaction which spend tip block's cellbase
@@ -261,8 +261,8 @@ impl Node {
         self.new_transaction(cellbase.hash().to_owned())
     }
 
-    pub fn submit_transaction(&self, transaction: &Transaction) -> H256 {
-        self.rpc_client().send_transaction(transaction.into())
+    pub fn send_transaction(&self, transaction: &Transaction) -> H256 {
+        self.rpc_client().send_transaction(transaction)
     }
 
     pub fn get_tip_block(&self) -> Block {
@@ -271,7 +271,6 @@ impl Node {
         rpc_client
             .get_block_by_number(tip_number)
             .expect("tip block exists")
-            .into()
     }
 
     pub fn get_tip_block_number(&self) -> BlockNumber {
@@ -282,7 +281,6 @@ impl Node {
         self.rpc_client()
             .get_block_by_number(number)
             .expect("block exists")
-            .into()
     }
 
     pub fn new_block(
