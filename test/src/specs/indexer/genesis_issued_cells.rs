@@ -1,5 +1,5 @@
 use crate::utils::wait_until;
-use crate::{Net, Spec};
+use crate::{Net, Node, Spec};
 use bytes::Bytes;
 use ckb_chain_spec::{ChainSpec, IssuedCell};
 use ckb_core::{
@@ -15,8 +15,8 @@ pub struct GenesisIssuedCells;
 impl Spec for GenesisIssuedCells {
     crate::name!("genesis_issued_cells");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
 
         let lock_hash = Script {
             args: vec![Bytes::from(vec![1]), Bytes::from(vec![2])],

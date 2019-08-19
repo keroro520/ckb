@@ -1,5 +1,5 @@
-use crate::utils::assert_tx_pool_size;
-use crate::{Net, Spec};
+use crate::utils::{assert_tx_pool_size, waiting_for_sync};
+use crate::{Net, Node, Spec};
 use log::info;
 
 pub struct PoolResurrect;
@@ -9,9 +9,9 @@ impl Spec for PoolResurrect {
 
     crate::setup!(num_nodes: 2, connect_all: false);
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
 
         info!("Generate 1 block on node0");
         node0.mine_block();
@@ -39,7 +39,7 @@ impl Spec for PoolResurrect {
 
         info!("Connect node0 to node1, waiting for sync");
         node0.connect(node1);
-        net.waiting_for_sync(5);
+        waiting_for_sync(&nodes, 5);
 
         info!("6 txs should be returned to node0 pending pool");
         assert_tx_pool_size(node0, txs_hash.len() as u64, 0);

@@ -1,4 +1,5 @@
-use crate::{Net, Spec};
+use crate::utils::waiting_for_sync;
+use crate::{Net, Node, Spec};
 use log::info;
 
 pub struct PoolReconcile;
@@ -8,9 +9,9 @@ impl Spec for PoolReconcile {
 
     crate::setup!(connect_all: false, num_nodes: 2);
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
 
         info!("Generate 1 block on node0");
         node0.mine_block();
@@ -35,7 +36,7 @@ impl Spec for PoolReconcile {
         info!("Connect node0 to node1");
         node0.connect(node1);
 
-        net.waiting_for_sync(5);
+        waiting_for_sync(&nodes, 5);
 
         info!("Tx should be re-added to node0's pool");
         assert!(node0

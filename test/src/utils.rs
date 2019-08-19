@@ -8,10 +8,12 @@ use ckb_jsonrpc_types::{BlockTemplate, TransactionWithStatus, TxStatus};
 use ckb_protocol::{RelayMessage, SyncMessage};
 use flatbuffers::FlatBufferBuilder;
 use numext_fixed_hash::H256;
+use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::convert::Into;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
+use tempfile::tempdir;
 
 pub const MEDIAN_TIME_BLOCK_COUNT: u64 = 11;
 pub const FLAG_SINCE_RELATIVE: u64 =
@@ -114,7 +116,7 @@ where
 
 // Clear net message channel
 pub fn clear_messages(net: &Net) {
-    while let Ok(_) = net.receive_timeout(Duration::new(3, 0)) {}
+    while let Ok(_) = net.recv_timeout(Duration::new(3, 0)) {}
 }
 
 pub fn since_from_relative_block_number(block_number: BlockNumber) -> u64 {
@@ -174,10 +176,11 @@ pub fn assert_tx_pool_statics(node: &Node, total_tx_size: u64, total_tx_cycles: 
     assert_eq!(tx_pool_info.total_tx_cycles.0, total_tx_cycles);
 }
 
-// workaround for banned address checking (because we are using loopback address)
-// 1. checking banned addresses is empty
-// 2. connecting outbound peer and checking banned addresses is not empty
-// 3. clear banned addresses
+/// Workaround for checking banned address (because we are using loop-back address)
+///
+///   1. Checking banned addresses is empty
+///   2. Connecting outbound peer and checking banned addresses is not empty
+///   3. Clear banned addresses
 pub fn connect_and_wait_ban(inbound: &Node, outbound: &Node) {
     let node_info = outbound.local_node_info();
     let node_id = node_info.node_id;
@@ -191,36 +194,80 @@ pub fn connect_and_wait_ban(inbound: &Node, outbound: &Node) {
         format!("/ip4/127.0.0.1/tcp/{}", outbound.p2p_port()),
     );
 
-    let result = wait_until(10, || {
+    let empty_banned = wait_until(10, || {
         let banned_addresses = inbound.get_banned_addresses();
-        let result = banned_addresses.is_empty();
+        let empty_banned = banned_addresses.is_empty();
         banned_addresses.into_iter().for_each(|ban_address| {
             inbound.set_ban(ban_address.address, "delete".to_owned(), None, None, None)
         });
-        result
+        empty_banned
     });
 
-    if !result {
-        panic!(
-            "Connect and wait ban outbound peer timeout, node id: {}",
-            node_id
-        );
+    assert!(
+        empty_banned,
+        "check_and_wait_ban timeout, node_id: {}",
+        node_id,
+    );
+}
+
+/// All nodes disconnect each other
+pub fn disconnect_all(nodes: &[Node]) {
+    for i in 0..nodes.len() {
+        for j in i + 1..nodes.len() {
+            nodes[i].disconnect(&nodes[j]);
+            nodes[j].disconnect(&nodes[i]);
+        }
     }
 }
 
-pub fn waiting_for_sync(node0: &Node, node1: &Node, target: BlockNumber) {
-    let (mut self_tip_number, mut node_tip_number) = (0, 0);
-    // 60 seconds is a reasonable timeout to sync, even for poor CI server
-    let result = wait_until(60, || {
-        self_tip_number = node0.tip_number();
-        node_tip_number = node1.tip_number();
-        self_tip_number == node_tip_number && target == self_tip_number
-    });
+/// All nodes connect each other
+pub fn connect_all(nodes: &[Node]) {
+    nodes
+        .windows(2)
+        .for_each(|nodes| nodes[0].connect(&nodes[1]));
+}
 
-    if !result {
-        panic!(
-            "Waiting for sync timeout, self_tip_number: {}, node_tip_number: {}",
-            self_tip_number, node_tip_number
-        );
-    }
+/// All nodes mine a same block to exit the IBD mode
+pub fn exit_ibd_mode(nodes: &[Node]) {
+    let block = nodes[0].build_block(None, None, None);
+    nodes.iter().for_each(|node| {
+        node.submit_block(&block);
+    });
+}
+
+pub fn waiting_for_sync<N>(nodes: &[N], expected: BlockNumber)
+where
+    N: Borrow<Node>,
+{
+    // 60 seconds is a reasonable timeout to sync, even for poor CI server
+    let synced = wait_until(60, || {
+        nodes
+            .iter()
+            .map(|node| node.borrow().tip_number())
+            .all(|tip_number| tip_number == expected)
+    });
+    assert!(
+        synced,
+        "waiting_for_sync timeout, expected: {}, actual: {:?}",
+        expected,
+        nodes
+            .iter()
+            .map(|node| node.borrow().tip_number())
+            .collect::<Vec<_>>(),
+    );
+}
+
+pub fn waiting_for_sync2(node_a: &Node, node_b: &Node, expected: BlockNumber) {
+    waiting_for_sync(&[node_a, node_b], expected)
+}
+
+/// Return a random path located on temp_dir
+///
+/// We use `tempdir` only for generating a random path, and expect the corresponding directory
+/// that `tempdir` creates be deleted when go out of this function.
+pub fn temp_path() -> String {
+    let tempdir = tempdir().expect("create tempdir failed");
+    let path = tempdir.path().to_str().unwrap().to_owned();
+    tempdir.close().expect("close tempdir failed");
+    path
 }

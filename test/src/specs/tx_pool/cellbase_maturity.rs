@@ -1,5 +1,5 @@
 use crate::utils::assert_tx_pool_size;
-use crate::{assert_regex_match, Net, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
+use crate::{assert_regex_match, Net, Node, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
 use ckb_chain_spec::ChainSpec;
 use ckb_core::BlockNumber;
 use log::info;
@@ -11,8 +11,8 @@ pub struct CellbaseMaturity;
 impl Spec for CellbaseMaturity {
     crate::name!("cellbase_maturity");
 
-    fn run(&self, net: Net) {
-        let node = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node = &nodes[0];
 
         info!("Generate 1 block");
         node.mine_block();

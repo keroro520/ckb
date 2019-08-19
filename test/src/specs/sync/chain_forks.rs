@@ -1,5 +1,5 @@
-use crate::utils::{connect_and_wait_ban, waiting_for_sync};
-use crate::{Net, Spec};
+use crate::utils::{connect_and_wait_ban, disconnect_all, waiting_for_sync, waiting_for_sync2};
+use crate::{Net, Node, Spec};
 use ckb_app_config::CKBAppConfig;
 use ckb_core::block::{Block, BlockBuilder};
 use ckb_core::transaction::{Transaction, TransactionBuilder};
@@ -18,16 +18,16 @@ impl Spec for ChainFork1 {
     //                  1    2    3    4
     // node0 genesis -> A -> B -> C
     // node1                 \ -> D -> E
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
 
         info!("Generate 2 blocks (A, B) on node0");
         node0.mine_blocks(2);
 
         info!("Connect node0 to node1");
         node1.connect(node0);
-        waiting_for_sync(node0, node1, 2);
+        waiting_for_sync2(node0, node1, 2);
         info!("Disconnect node1");
         node0.disconnect(node1);
 
@@ -38,7 +38,7 @@ impl Spec for ChainFork1 {
 
         info!("Reconnect node0 to node1");
         node0.connect(node1);
-        net.waiting_for_sync(4);
+        waiting_for_sync(&nodes, 4);
     }
 
     // workaround to disable node discovery
@@ -59,10 +59,10 @@ impl Spec for ChainFork2 {
     // node0 genesis -> A -> B -> C
     // node1                 \ -> D -> E
     // node2                 \ -> C -> F -> G
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
         node0.mine_blocks(2);
@@ -70,14 +70,14 @@ impl Spec for ChainFork2 {
         info!("Connect all nodes");
         node1.connect(node0);
         node2.connect(node0);
-        net.waiting_for_sync(2);
+        waiting_for_sync(&nodes, 2);
         info!("Disconnect all nodes");
-        net.disconnect_all();
+        disconnect_all(&nodes);
 
         info!("Generate 1 block (C) on node0");
         node0.mine_blocks(1);
         node0.connect(node2);
-        waiting_for_sync(node0, node2, 3);
+        waiting_for_sync2(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
@@ -85,14 +85,14 @@ impl Spec for ChainFork2 {
         node1.mine_blocks(2);
         info!("Reconnect node1");
         node0.connect(node1);
-        waiting_for_sync(node0, node1, 4);
+        waiting_for_sync2(node0, node1, 4);
 
         info!("Generate 2 blocks (F, G) on node2");
         node2.mine_blocks(2);
         info!("Reconnect node2");
         node0.connect(node2);
         node1.connect(node2);
-        net.waiting_for_sync(5);
+        waiting_for_sync(&nodes, 5);
     }
 }
 
@@ -108,10 +108,10 @@ impl Spec for ChainFork3 {
     // node0 genesis -> A -> B -> C
     // node1                 \ -> D -> E -> F
     // node2                 \ -> C -> G
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
         node0.mine_blocks(2);
@@ -119,15 +119,15 @@ impl Spec for ChainFork3 {
         info!("Connect all nodes");
         node1.connect(node0);
         node2.connect(node0);
-        net.waiting_for_sync(2);
+        waiting_for_sync(&nodes, 2);
 
         info!("Disconnect all nodes");
-        net.disconnect_all();
+        disconnect_all(&nodes);
 
         info!("Generate 1 block (C) on node0");
         node0.mine_blocks(1);
         node0.connect(node2);
-        waiting_for_sync(node0, node2, 3);
+        waiting_for_sync2(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
@@ -154,7 +154,7 @@ impl Spec for ChainFork3 {
         info!("Reconnect node2");
         node2.connect(node0);
         connect_and_wait_ban(node2, node1);
-        waiting_for_sync(node0, node2, 4);
+        waiting_for_sync2(node0, node2, 4);
     }
 }
 
@@ -170,10 +170,10 @@ impl Spec for ChainFork4 {
     // node0 genesis -> A -> B -> C
     // node1                 \ -> D -> E -> F
     // node2                 \ -> C -> G
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
         node0.mine_blocks(2);
@@ -181,15 +181,15 @@ impl Spec for ChainFork4 {
         info!("Connect all nodes");
         node1.connect(node0);
         node2.connect(node0);
-        net.waiting_for_sync(2);
+        waiting_for_sync(&nodes, 2);
 
         info!("Disconnect all nodes");
-        net.disconnect_all();
+        disconnect_all(&nodes);
 
         info!("Generate 1 block (C) on node0");
         node0.mine_blocks(1);
         node0.connect(node2);
-        waiting_for_sync(node0, node2, 3);
+        waiting_for_sync2(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
@@ -216,7 +216,7 @@ impl Spec for ChainFork4 {
         info!("Reconnect node2");
         node2.connect(node0);
         connect_and_wait_ban(node2, node1);
-        waiting_for_sync(node0, node2, 4);
+        waiting_for_sync2(node0, node2, 4);
     }
 }
 
@@ -232,10 +232,10 @@ impl Spec for ChainFork5 {
     // node0 genesis -> A -> B -> C
     // node1                 \ -> D -> E -> F
     // node2                 \ -> C -> G
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
 
         info!("Generate 1 block (A) on node0");
         node0.mine_blocks(1);
@@ -246,15 +246,15 @@ impl Spec for ChainFork5 {
         info!("Connect all nodes");
         node1.connect(node0);
         node2.connect(node0);
-        net.waiting_for_sync(2);
+        waiting_for_sync(&nodes, 2);
 
         info!("Disconnect all nodes");
-        net.disconnect_all();
+        disconnect_all(&nodes);
 
         info!("Generate 1 block (C) on node0");
         node0.mine_blocks(1);
         node0.connect(node2);
-        waiting_for_sync(node0, node2, 3);
+        waiting_for_sync2(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
@@ -282,7 +282,7 @@ impl Spec for ChainFork5 {
         info!("Reconnect node2");
         node2.connect(node0);
         connect_and_wait_ban(node2, node1);
-        waiting_for_sync(node0, node2, 4);
+        waiting_for_sync2(node0, node2, 4);
     }
 }
 
@@ -298,10 +298,10 @@ impl Spec for ChainFork6 {
     // node0 genesis -> A -> B -> C
     // node1                 \ -> D -> E -> F
     // node2                 \ -> C -> G
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
         node0.mine_blocks(2);
@@ -309,15 +309,15 @@ impl Spec for ChainFork6 {
         info!("Connect all nodes");
         node1.connect(node0);
         node2.connect(node0);
-        net.waiting_for_sync(2);
+        waiting_for_sync(&nodes, 2);
 
         info!("Disconnect all nodes");
-        net.disconnect_all();
+        disconnect_all(&nodes);
 
         info!("Generate 1 block (C) on node0");
         node0.mine_blocks(1);
         node0.connect(node2);
-        waiting_for_sync(node0, node2, 3);
+        waiting_for_sync2(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
@@ -340,7 +340,7 @@ impl Spec for ChainFork6 {
         info!("Reconnect node2");
         node2.connect(node0);
         connect_and_wait_ban(node2, node1);
-        waiting_for_sync(node0, node2, 4);
+        waiting_for_sync2(node0, node2, 4);
     }
 }
 
@@ -356,10 +356,10 @@ impl Spec for ChainFork7 {
     // node0 genesis -> A -> B -> C
     // node1                 \ -> D -> E -> F
     // node2                 \ -> C -> G
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
         node0.mine_blocks(2);
@@ -367,15 +367,15 @@ impl Spec for ChainFork7 {
         info!("Connect all nodes");
         node1.connect(node0);
         node2.connect(node0);
-        net.waiting_for_sync(2);
+        waiting_for_sync(&nodes, 2);
 
         info!("Disconnect all nodes");
-        net.disconnect_all();
+        disconnect_all(&nodes);
 
         info!("Generate 1 block (C) on node0");
         node0.mine_blocks(1);
         node0.connect(node2);
-        waiting_for_sync(node0, node2, 3);
+        waiting_for_sync2(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
@@ -404,7 +404,7 @@ impl Spec for ChainFork7 {
         info!("Reconnect node2");
         node2.connect(node0);
         connect_and_wait_ban(node2, node1);
-        waiting_for_sync(node0, node2, 4);
+        waiting_for_sync2(node0, node2, 4);
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::utils::assert_tx_pool_statics;
-use crate::{assert_regex_match, Net, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
+use crate::{assert_regex_match, Net, Node, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
 use ckb_app_config::CKBAppConfig;
 use log::info;
 
@@ -8,8 +8,8 @@ pub struct SizeLimit;
 impl Spec for SizeLimit {
     crate::name!("size_limit");
 
-    fn run(&self, net: Net) {
-        let node = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node = &nodes[0];
 
         info!("Generate 1 block on node");
         node.mine_block();
@@ -55,8 +55,8 @@ pub struct CyclesLimit;
 impl Spec for CyclesLimit {
     crate::name!("cycles_limit");
 
-    fn run(&self, net: Net) {
-        let node = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node = &nodes[0];
 
         info!("Generate 1 block on node");
         node.mine_block();

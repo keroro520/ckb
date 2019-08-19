@@ -1,4 +1,4 @@
-use crate::{Net, Spec};
+use crate::{Net, Node, Spec};
 use ckb_core::transaction::{ProposalShortId, Transaction};
 use log::info;
 
@@ -7,8 +7,8 @@ pub struct DepentTxInSameBlock;
 impl Spec for DepentTxInSameBlock {
     crate::name!("depent_tx_in_same_block");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
 
         info!("Generate 2 tx in same block");
         node0.mine_block();

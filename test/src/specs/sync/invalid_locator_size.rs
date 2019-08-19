@@ -1,5 +1,5 @@
-use crate::utils::wait_until;
-use crate::{Net, Spec, TestProtocol};
+use crate::utils::{exit_ibd_mode, wait_until};
+use crate::{Net, Node, Spec, TestProtocol};
 use ckb_protocol::SyncMessage;
 use ckb_sync::{NetworkProtocol, MAX_LOCATOR_SIZE};
 use flatbuffers::FlatBufferBuilder;
@@ -13,13 +13,13 @@ impl Spec for InvalidLocatorSize {
 
     crate::setup!(protocols: vec![TestProtocol::sync()]);
 
-    fn run(&self, net: Net) {
+    fn run(&self, net: Net, nodes: Vec<Node>) {
         info!("Connect node0");
-        net.exit_ibd_mode();
-        let node0 = &net.nodes[0];
+        exit_ibd_mode(&nodes);
+        let node0 = &nodes[0];
         net.connect(node0);
         // get peer_id from GetHeaders message
-        let (peer_id, _, _) = net.receive();
+        let (peer_id, _, _) = net.recv();
 
         let hashes: Vec<_> = (0..=MAX_LOCATOR_SIZE).map(|_| h256!("0x1")).collect();
         let fbb = &mut FlatBufferBuilder::new();
@@ -31,11 +31,11 @@ impl Spec for InvalidLocatorSize {
             fbb.finished_data().into(),
         );
 
-        let ret = wait_until(10, || net.nodes[0].get_peers().is_empty());
+        let ret = wait_until(10, || nodes[0].get_peers().is_empty());
         assert!(ret, "Node0 should disconnect test node");
 
         net.connect(node0);
-        let ret = wait_until(10, || !net.nodes[0].get_peers().is_empty());
+        let ret = wait_until(10, || !nodes[0].get_peers().is_empty());
         assert!(!ret, "Node0 should ban test node");
     }
 }

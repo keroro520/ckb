@@ -1,4 +1,4 @@
-use crate::{Net, Spec};
+use crate::{Net, Node, Spec};
 use ckb_core::transaction::{Transaction, TransactionBuilder};
 use ckb_core::{capacity_bytes, Capacity};
 use log::info;
@@ -8,8 +8,8 @@ pub struct DifferentTxsWithSameInput;
 impl Spec for DifferentTxsWithSameInput {
     crate::name!("different_txs_with_same_input");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
 
         node0.mine_block();
         let tx_hash_0 = node0.send_transaction_with_tip_cellbase();

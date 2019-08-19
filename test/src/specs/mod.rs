@@ -14,7 +14,8 @@ pub use relay::*;
 pub use sync::*;
 pub use tx_pool::*;
 
-use crate::Net;
+use crate::utils::connect_all;
+use crate::{Net, Node};
 use ckb_app_config::CKBAppConfig;
 use ckb_chain_spec::ChainSpec;
 use ckb_network::{ProtocolId, ProtocolVersion};
@@ -47,6 +48,7 @@ macro_rules! setup_internal {
     };
 }
 
+#[derive(Clone)]
 pub struct Setup {
     pub num_nodes: usize,
     pub connect_all: bool,
@@ -70,8 +72,6 @@ pub trait Spec {
         Setup::default()
     }
 
-    fn run(&self, net: Net);
-
     fn modify_chain_spec(&self) -> Box<dyn Fn(&mut ChainSpec) -> ()> {
         Box::new(|_| ())
     }
@@ -84,22 +84,33 @@ pub trait Spec {
         })
     }
 
-    fn setup_net(&self, binary: &str, start_port: u16) -> Net {
-        let setup = self.setup();
+    fn run(&self, net: Net, nodes: Vec<Node>);
 
-        let mut net = Net::new(binary, setup.num_nodes, start_port, setup.protocols);
-
-        // start all nodes
-        net.nodes.iter_mut().for_each(|node| {
+    fn prepare(&self, binary: &str, start_port: u16) -> (Net, Vec<Node>) {
+        // Start nodes
+        let mut nodes: Vec<Node> = (0..self.setup().num_nodes)
+            .map(|n| {
+                Node::new(
+                    binary,
+                    start_port + (n * 2 + 1) as u16,
+                    start_port + (n * 2 + 2) as u16,
+                )
+            })
+            .collect();
+        nodes.iter_mut().for_each(|node| {
             node.start(self.modify_chain_spec(), self.modify_ckb_config());
         });
 
+        // Start net
+        let net = Net::new(self.setup(), start_port);
+
+        // TODO FIXME bilibili
         // connect the nodes as a linear chain: node0 <-> node1 <-> node2 <-> ...
-        if setup.connect_all {
-            net.connect_all();
+        if self.setup().connect_all {
+            connect_all(&nodes);
         }
 
-        net
+        (net, nodes)
     }
 }
 

@@ -1,5 +1,5 @@
-use crate::utils::{assert_tx_pool_size, wait_until};
-use crate::{Net, Spec};
+use crate::utils::{assert_tx_pool_size, exit_ibd_mode, wait_until, waiting_for_sync};
+use crate::{Net, Node, Spec};
 use ckb_core::transaction::{CellInput, OutPoint, TransactionBuilder};
 use ckb_core::Capacity;
 use log::info;
@@ -11,12 +11,12 @@ impl Spec for TransactionRelayBasic {
 
     crate::setup!(num_nodes: 3);
 
-    fn run(&self, net: Net) {
-        net.exit_ibd_mode();
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        exit_ibd_mode(&nodes);
 
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
 
         info!("Generate new transaction on node1");
         node1.mine_block();
@@ -54,10 +54,11 @@ impl Spec for TransactionRelayMultiple {
 
     crate::setup!(num_nodes: 5);
 
-    fn run(&self, net: Net) {
-        let block = net.exit_ibd_mode();
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        exit_ibd_mode(&nodes);
+        let node0 = &nodes[0];
         info!("Use generated block's cellbase as tx input");
+        let block = node0.tip_block();
         let reward = block.transactions()[0].outputs()[0].capacity;
         let txs_num = reward.as_u64() / MIN_CAPACITY;
 
@@ -74,7 +75,7 @@ impl Spec for TransactionRelayMultiple {
         node0.mine_block();
         node0.mine_block();
         node0.mine_block();
-        net.waiting_for_sync(4);
+        waiting_for_sync(&nodes, 4);
 
         info!("Send multiple transactions to node0");
         let tx_hash = transaction.hash().to_owned();
@@ -94,12 +95,12 @@ impl Spec for TransactionRelayMultiple {
         node0.mine_block();
         node0.mine_block();
         node0.mine_block();
-        net.waiting_for_sync(7);
+        waiting_for_sync(&nodes, 7);
 
         info!("All transactions should be relayed and mined");
         assert_tx_pool_size(node0, 0, 0);
 
-        net.nodes
+        nodes
             .iter()
             .for_each(|node| assert_eq!(node.tip_block().transactions().len() as u64, txs_num + 1));
     }

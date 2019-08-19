@@ -1,5 +1,5 @@
 use crate::utils::wait_until;
-use crate::{Net, Spec};
+use crate::{Net, Node, Spec};
 use ckb_app_config::CKBAppConfig;
 use log::info;
 
@@ -10,9 +10,9 @@ impl Spec for Discovery {
 
     crate::setup!(num_nodes: 3);
 
-    fn run(&self, net: Net) {
-        let node0_id = net.nodes[0].node_id();
-        let node2 = &net.nodes[2];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0_id = nodes[0].node_id();
+        let node2 = &nodes[2];
         let rpc_client = node2;
 
         info!("Waiting for discovering");

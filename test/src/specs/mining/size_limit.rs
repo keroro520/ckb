@@ -1,4 +1,4 @@
-use crate::{Net, Spec};
+use crate::{Net, Node, Spec};
 use log::info;
 
 pub struct TemplateSizeLimit;
@@ -6,8 +6,8 @@ pub struct TemplateSizeLimit;
 impl Spec for TemplateSizeLimit {
     crate::name!("template_size_limit");
 
-    fn run(&self, net: Net) {
-        let node = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node = &nodes[0];
 
         info!("Generate 1 block");
         node.mine_block();

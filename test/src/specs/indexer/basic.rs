@@ -1,5 +1,5 @@
-use crate::utils::{wait_until, waiting_for_sync};
-use crate::{Net, Spec};
+use crate::utils::{wait_until, waiting_for_sync2};
+use crate::{Net, Node, Spec};
 use log::info;
 
 pub struct IndexerBasic;
@@ -9,9 +9,9 @@ impl Spec for IndexerBasic {
 
     crate::setup!(num_nodes: 2, connect_all: false);
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
 
         info!("Generate 1 block on node0");
         node0.mine_block();
@@ -77,7 +77,7 @@ impl Spec for IndexerBasic {
         info!("Generate 5 blocks on node1 and connect node0 to switch fork");
         node1.mine_blocks(5);
         node0.connect(node1);
-        waiting_for_sync(node0, node1, 5);
+        waiting_for_sync2(node0, node1, 5);
         info!("Live cells size should be 5, cell transactions size should be 5");
         let result = wait_until(5, || {
             let live_cells = rpc_client.get_live_cells_by_lock_hash(lock_hash.clone(), 0, 20, None);

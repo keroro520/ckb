@@ -11,8 +11,8 @@ pub struct MiningBasic;
 impl Spec for MiningBasic {
     crate::name!("mining_basic");
 
-    fn run(&self, net: Net) {
-        let node = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node = &nodes[0];
 
         self.test_basic(node);
         self.test_block_template_cache(node);

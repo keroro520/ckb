@@ -1,7 +1,7 @@
 use crate::utils::{
     build_block, build_get_blocks, build_headers, connect_and_wait_ban, wait_until,
 };
-use crate::{Net, Spec, TestProtocol};
+use crate::{Net, Node, Spec, TestProtocol};
 use ckb_core::block::Block;
 use ckb_core::transaction::TransactionBuilder;
 use ckb_protocol::{get_root, SyncMessage, SyncPayload};
@@ -27,11 +27,10 @@ impl Spec for ChainContainsInvalidBlock {
     //   3. `good_node` mines a new block B[i]', i < `CN.length`.
     //   4. `fresh_node` synchronizes from `bad_node` and `good_node`. We expect
     //      that `fresh_node` synchronizes the valid chain.
-    fn run(&self, net: Net) {
-        let mut net = net;
-        let bad_node = net.nodes.pop().unwrap();
-        let good_node = net.nodes.pop().unwrap();
-        let fresh_node = net.nodes.pop().unwrap();
+    fn run(&self, _net: Net, mut nodes: Vec<Node>) {
+        let bad_node = nodes.pop().unwrap();
+        let good_node = nodes.pop().unwrap();
+        let fresh_node = nodes.pop().unwrap();
 
         // Build invalid chain on bad_node
         bad_node.mine_blocks(3);
@@ -86,14 +85,12 @@ impl Spec for ForkContainsInvalidBlock {
         protocols: vec![TestProtocol::sync()],
     );
 
-    fn run(&self, net: Net) {
-        let mut net = net;
-
+    fn run(&self, net: Net, mut nodes: Vec<Node>) {
         // Build bad forks
         let invalid_number = 4;
         let bad_chain: Vec<Block> = {
             let tip_number = invalid_number * 2;
-            let bad_node = net.nodes.pop().unwrap();
+            let bad_node = nodes.pop().unwrap();
             bad_node.mine_blocks(invalid_number - 1);
             let invalid_block = bad_node
                 .build_block_builder(None, None, None)
@@ -112,10 +109,10 @@ impl Spec for ForkContainsInvalidBlock {
             .collect();
 
         // Sync headers of bad forks
-        let good_node = net.nodes.pop().unwrap();
+        let good_node = nodes.pop().unwrap();
         good_node.mine_block();
         net.connect(&good_node);
-        let (pi, _, _) = net.receive();
+        let (pi, _, _) = net.recv();
         let headers: Vec<_> = bad_chain.iter().map(|b| b.header().clone()).collect();
         net.send(NetworkProtocol::SYNC.into(), pi, build_headers(&headers));
         assert!(wait_get_blocks(&net), "timeout to wait GetBlocks",);
@@ -162,7 +159,7 @@ impl Spec for ForkContainsInvalidBlock {
             build_get_blocks(&bad_hashes),
         );
         let ret = wait_until(10, || {
-            if let Ok((_, _, data)) = net.receive_timeout(Duration::from_secs(10)) {
+            if let Ok((_, _, data)) = net.recv_timeout(Duration::from_secs(10)) {
                 if let Ok(message) = get_root::<SyncMessage>(&data) {
                     return message.payload_type() == SyncPayload::Block;
                 }
@@ -178,7 +175,7 @@ impl Spec for ForkContainsInvalidBlock {
 
 fn wait_get_blocks(net: &Net) -> bool {
     wait_until(10, || {
-        if let Ok((_, _, data)) = net.receive_timeout(Duration::from_secs(10)) {
+        if let Ok((_, _, data)) = net.recv_timeout(Duration::from_secs(10)) {
             if let Ok(message) = get_root::<SyncMessage>(&data) {
                 return message.payload_type() == SyncPayload::GetBlocks;
             }

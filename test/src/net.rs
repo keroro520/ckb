@@ -1,6 +1,5 @@
-use crate::specs::TestProtocol;
 use crate::utils::wait_until;
-use crate::Node;
+use crate::{Node, Setup};
 use bytes::Bytes;
 use ckb_core::{block::Block, BlockNumber};
 use ckb_network::{
@@ -17,20 +16,14 @@ pub type NetMessage = (PeerIndex, ProtocolId, Bytes);
 
 pub struct Net {
     pub nodes: Vec<Node>,
-    pub controller: Option<(NetworkController, Receiver<NetMessage>)>,
-    pub test_protocols: Vec<TestProtocol>,
-    num_nodes: usize,
+    controller: Option<(NetworkController, Receiver<NetMessage>)>,
+    setup: Setup,
     start_port: u16,
 }
 
 impl Net {
-    pub fn new(
-        binary: &str,
-        num_nodes: usize,
-        start_port: u16,
-        test_protocols: Vec<TestProtocol>,
-    ) -> Self {
-        let nodes: Vec<Node> = (0..num_nodes)
+    pub fn new(binary: &str, setup: Setup, start_port: u16) -> Self {
+        let nodes: Vec<Node> = (0..setup.num_nodes)
             .map(|n| {
                 Node::new(
                     binary,
@@ -48,83 +41,92 @@ impl Net {
         Self {
             nodes,
             controller: None,
-            test_protocols,
             start_port,
-            num_nodes,
+            setup,
+        }
+    }
+
+    pub fn controller(&self) -> &(NetworkController, Receiver<NetMessage>) {
+        self.controller.as_ref().unwrap()
+    }
+
+    fn init_controller(&self, node: &Node) {
+        assert!(
+            !self.setup.protocols.is_empty(),
+            "It should not involve Net::init_controller when setup test_protocols is empty.\
+             Please specify non-empty test_protocols"
+        );
+
+        let (tx, rx) = crossbeam_channel::unbounded();
+        let config = NetworkConfig {
+            listen_addresses: vec![format!("/ip4/127.0.0.1/tcp/{}", self.start_port)
+                .parse()
+                .expect("invalid address")],
+            public_addresses: vec![],
+            bootnodes: vec![],
+            dns_seeds: vec![],
+            whitelist_peers: vec![],
+            whitelist_only: false,
+            max_peers: self.setup.num_nodes as u32,
+            max_outbound_peers: self.setup.num_nodes as u32,
+            path: tempdir()
+                .expect("create tempdir failed")
+                .path()
+                .to_path_buf(),
+            ping_interval_secs: 15,
+            ping_timeout_secs: 20,
+            connect_outbound_interval_secs: 0,
+            discovery_local_address: true,
+            upnp: false,
+            bootnode_mode: false,
+            max_send_buffer: None,
+        };
+
+        let network_state =
+            Arc::new(NetworkState::from_config(config).expect("Init network state failed"));
+
+        let protocols = self
+            .setup
+            .protocols
+            .clone()
+            .into_iter()
+            .map(|tp| {
+                let tx = tx.clone();
+                CKBProtocol::new(
+                    tp.protocol_name,
+                    tp.id,
+                    &tp.supported_versions,
+                    move || Box::new(DummyProtocolHandler { tx: tx.clone() }),
+                    Arc::clone(&network_state),
+                )
+            })
+            .collect();
+
+        let controller = Some((
+            NetworkService::new(
+                Arc::clone(&network_state),
+                protocols,
+                node.consensus().identify_name(),
+                "0.1.0".to_string(),
+            )
+            .start(Default::default(), Some("NetworkService"))
+            .expect("Start network service failed"),
+            rx,
+        ));
+
+        let ptr = self as *const Self as *mut Self;
+        unsafe {
+            ::std::mem::replace(&mut (*ptr).controller, controller);
         }
     }
 
     pub fn connect(&self, node: &Node) {
         if self.controller.is_none() {
-            let controller = if self.test_protocols.is_empty() {
-                None
-            } else {
-                let (tx, rx) = crossbeam_channel::unbounded();
-
-                let config = NetworkConfig {
-                    listen_addresses: vec![format!("/ip4/127.0.0.1/tcp/{}", self.start_port)
-                        .parse()
-                        .expect("invalid address")],
-                    public_addresses: vec![],
-                    bootnodes: vec![],
-                    dns_seeds: vec![],
-                    whitelist_peers: vec![],
-                    whitelist_only: false,
-                    max_peers: self.num_nodes as u32,
-                    max_outbound_peers: self.num_nodes as u32,
-                    path: tempdir()
-                        .expect("create tempdir failed")
-                        .path()
-                        .to_path_buf(),
-                    ping_interval_secs: 15,
-                    ping_timeout_secs: 20,
-                    connect_outbound_interval_secs: 0,
-                    discovery_local_address: true,
-                    upnp: false,
-                    bootnode_mode: false,
-                    max_send_buffer: None,
-                };
-
-                let network_state =
-                    Arc::new(NetworkState::from_config(config).expect("Init network state failed"));
-
-                let protocols = self
-                    .test_protocols
-                    .clone()
-                    .into_iter()
-                    .map(|tp| {
-                        let tx = tx.clone();
-                        CKBProtocol::new(
-                            tp.protocol_name,
-                            tp.id,
-                            &tp.supported_versions,
-                            move || Box::new(DummyProtocolHandler { tx: tx.clone() }),
-                            Arc::clone(&network_state),
-                        )
-                    })
-                    .collect();
-
-                Some((
-                    NetworkService::new(
-                        Arc::clone(&network_state),
-                        protocols,
-                        node.consensus().identify_name(),
-                        "0.1.0".to_string(),
-                    )
-                    .start(Default::default(), Some("NetworkService"))
-                    .expect("Start network service failed"),
-                    rx,
-                ))
-            };
-
-            let ptr = self as *const Self as *mut Self;
-            unsafe {
-                ::std::mem::replace(&mut (*ptr).controller, controller);
-            }
+            self.init_controller(node);
         }
 
         let node_info = node.local_node_info();
-        self.controller.as_ref().unwrap().0.add_node(
+        self.controller().0.add_node(
             &node_info.node_id.parse().expect("invalid peer_id"),
             format!("/ip4/127.0.0.1/tcp/{}", node.p2p_port())
                 .parse()
@@ -175,20 +177,18 @@ impl Net {
     }
 
     pub fn send(&self, protocol_id: ProtocolId, peer: PeerIndex, data: Bytes) {
-        self.controller
-            .as_ref()
-            .unwrap()
+        self.controller()
             .0
             .send_message_to(peer, protocol_id, data)
             .expect("Send message to p2p network failed");
     }
 
     pub fn receive(&self) -> NetMessage {
-        self.controller.as_ref().unwrap().1.recv().unwrap()
+        self.controller().1.recv().unwrap()
     }
 
     pub fn receive_timeout(&self, timeout: Duration) -> Result<NetMessage, RecvTimeoutError> {
-        self.controller.as_ref().unwrap().1.recv_timeout(timeout)
+        self.controller().1.recv_timeout(timeout)
     }
 }
 

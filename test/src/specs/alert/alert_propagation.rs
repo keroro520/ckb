@@ -1,6 +1,6 @@
 use super::new_alert_config;
 use crate::utils::wait_until;
-use crate::{Net, Spec};
+use crate::{Net, Node, Spec};
 use ckb_app_config::CKBAppConfig;
 use ckb_core::{alert::AlertBuilder, Bytes};
 use ckb_crypto::secp::{Message, Privkey};
@@ -28,8 +28,8 @@ impl Spec for AlertPropagation {
 
     crate::setup!(num_nodes: 3);
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
         let warning1 = "pretend we are in dangerous status";
         let id1 = 42;
         let notice_until = faketime::unix_time_as_millis() + 100_000;
@@ -56,12 +56,12 @@ impl Spec for AlertPropagation {
         node0.send_alert(alert.clone());
         info!("Waiting for alert relay");
         let ret = wait_until(20, || {
-            net.nodes
+            nodes
                 .iter()
                 .all(|node| !node.get_blockchain_info().alerts.is_empty())
         });
         assert!(ret, "alert is relayed");
-        for node in net.nodes.iter() {
+        for node in nodes.iter() {
             let alerts = node.get_blockchain_info().alerts;
             assert_eq!(alerts.len(), 1);
             assert_eq!(alerts[0].message, warning1);
@@ -89,7 +89,7 @@ impl Spec for AlertPropagation {
         node0.send_alert(alert2);
         info!("Waiting for alert relay");
         let ret = wait_until(20, || {
-            net.nodes.iter().all(|node| {
+            nodes.iter().all(|node| {
                 node.get_blockchain_info()
                     .alerts
                     .iter()
@@ -97,7 +97,7 @@ impl Spec for AlertPropagation {
             })
         });
         assert!(ret, "alert is relayed");
-        for node in net.nodes.iter() {
+        for node in nodes.iter() {
             let alerts = node.get_blockchain_info().alerts;
             assert_eq!(alerts.len(), 1);
             assert_eq!(alerts[0].message, warning2);

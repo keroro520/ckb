@@ -1,4 +1,4 @@
-use crate::{Net, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
+use crate::{Net, Node, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
 use ckb_app_config::{BlockAssemblerConfig, CKBAppConfig};
 use ckb_chain_spec::ChainSpec;
 use ckb_core::script::{Script as CoreScript, ScriptHashType};
@@ -11,8 +11,8 @@ pub struct BootstrapCellbase;
 impl Spec for BootstrapCellbase {
     crate::name!("bootstrap_cellbase");
 
-    fn run(&self, net: Net) {
-        let node = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node = &nodes[0];
 
         let blk_hashes: Vec<_> = (0..=DEFAULT_TX_PROPOSAL_WINDOW.1)
             .map(|_| node.mine_block())

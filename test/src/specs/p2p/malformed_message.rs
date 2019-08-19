@@ -1,5 +1,5 @@
-use crate::utils::wait_until;
-use crate::{Net, Spec, TestProtocol};
+use crate::utils::{exit_ibd_mode, wait_until};
+use crate::{Net, Node, Spec, TestProtocol};
 use ckb_protocol::{get_root, SyncMessage, SyncPayload};
 use ckb_sync::NetworkProtocol;
 use log::info;
@@ -11,14 +11,14 @@ impl Spec for MalformedMessage {
 
     crate::setup!(protocols: vec![TestProtocol::sync()]);
 
-    fn run(&self, net: Net) {
+    fn run(&self, net: Net, nodes: Vec<Node>) {
         info!("Connect node0");
-        let node0 = &net.nodes[0];
-        net.exit_ibd_mode();
+        let node0 = &nodes[0];
+        exit_ibd_mode(&nodes);
         net.connect(node0);
 
         info!("Test node should receive GetHeaders message from node0");
-        let (peer_id, _, data) = net.receive();
+        let (peer_id, _, data) = net.recv();
         let msg = get_root::<SyncMessage>(&data).expect("parse message failed");
         assert_eq!(SyncPayload::GetHeaders, msg.payload_type());
 
@@ -33,10 +33,10 @@ impl Spec for MalformedMessage {
             peer_id,
             vec![0, 1, 2, 3].into(),
         );
-        let ret = wait_until(10, || net.nodes[0].get_peers().is_empty());
+        let ret = wait_until(10, || nodes[0].get_peers().is_empty());
         assert!(ret, "Node0 should disconnect test node");
         let ret = wait_until(10, || {
-            net.nodes[0]
+            nodes[0]
                 .get_banned_addresses()
                 .iter()
                 .any(|ban| ban.address == "127.0.0.1/32")

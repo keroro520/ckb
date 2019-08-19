@@ -1,5 +1,5 @@
 use crate::utils::wait_until;
-use crate::{Net, Spec};
+use crate::{Net, Node, Spec};
 use log::info;
 use std::{thread::sleep, time::Duration};
 
@@ -10,16 +10,16 @@ impl Spec for IBDProcess {
 
     crate::setup!(num_nodes: 7, connect_all: false);
 
-    fn run(&self, net: Net) {
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
         info!("Running IBD process");
 
-        let node0 = &net.nodes[0];
-        let node1 = &net.nodes[1];
-        let node2 = &net.nodes[2];
-        let node3 = &net.nodes[3];
-        let node4 = &net.nodes[4];
-        let node5 = &net.nodes[5];
-        let node6 = &net.nodes[6];
+        let node0 = &nodes[0];
+        let node1 = &nodes[1];
+        let node2 = &nodes[2];
+        let node3 = &nodes[3];
+        let node4 = &nodes[4];
+        let node5 = &nodes[5];
+        let node6 = &nodes[6];
 
         node0.connect(node1);
         node0.connect(node2);

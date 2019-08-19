@@ -19,14 +19,14 @@ pub struct ValidSince;
 impl Spec for ValidSince {
     crate::name!("valid_since");
 
-    fn run(&self, net: Net) {
-        self.test_since_relative_block_number(&net.nodes[0]);
-        self.test_since_absolute_block_number(&net.nodes[0]);
-        self.test_since_relative_median_time(&net.nodes[0]);
-        self.test_since_absolute_median_time(&net.nodes[0]);
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        self.test_since_relative_block_number(&nodes[0]);
+        self.test_since_absolute_block_number(&nodes[0]);
+        self.test_since_relative_median_time(&nodes[0]);
+        self.test_since_absolute_median_time(&nodes[0]);
 
         // TODO: Uncomment this case after proposed/pending pool tip verfiry logic changing
-        // self.test_since_and_proposal(&net.nodes[1]);
+        // self.test_since_and_proposal(&nodes[1]);
     }
 
     fn modify_chain_spec(&self) -> Box<dyn Fn(&mut ChainSpec) -> ()> {

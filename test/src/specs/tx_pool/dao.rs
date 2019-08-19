@@ -19,8 +19,8 @@ pub struct DepositDAO;
 impl Spec for DepositDAO {
     crate::name!("deposit_dao");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
         node0.mine_blocks(2);
 
         // Deposit DAO
@@ -52,8 +52,8 @@ pub struct WithdrawDAO;
 impl Spec for WithdrawDAO {
     crate::name!("withdraw_dao");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
         node0.mine_blocks(2);
 
         let deposited = {
@@ -70,8 +70,8 @@ pub struct WithdrawAndDepositDAOWithinSameTx;
 impl Spec for WithdrawAndDepositDAOWithinSameTx {
     crate::name!("withdraw_and_deposit_dao_within_same_tx");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
         node0.mine_blocks(2);
 
         let mut deposited = {
@@ -107,8 +107,8 @@ pub struct WithdrawDAOWithNotMaturitySince;
 impl Spec for WithdrawDAOWithNotMaturitySince {
     crate::name!("withdraw_dao_with_not_maturity_since");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
         node0.mine_blocks(2);
 
         let not_maturity = |node: &Node, previous_output: OutPoint| {
@@ -146,8 +146,8 @@ pub struct WithdrawDAOWithOverflowCapacity;
 impl Spec for WithdrawDAOWithOverflowCapacity {
     crate::name!("withdraw_dao_with_overflow_capacity");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
         node0.mine_blocks(2);
 
         let deposited = {
@@ -186,8 +186,8 @@ pub struct WithdrawDAOWithInvalidWitness;
 impl Spec for WithdrawDAOWithInvalidWitness {
     crate::name!("withdraw_dao_with_invalid_witness");
 
-    fn run(&self, net: Net) {
-        let node0 = &net.nodes[0];
+    fn run(&self, _net: Net, nodes: Vec<Node>) {
+        let node0 = &nodes[0];
         node0.mine_blocks(2);
 
         let deposited = {
