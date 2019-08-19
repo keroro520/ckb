@@ -64,7 +64,8 @@ impl ValidSince {
 
         // Success to send transaction after cellbase immaturity and since immaturity
         assert!(
-            node.rpc_client()
+            node
+                .rpc_client()
                 .inner()
                 .send_transaction((&transaction).into())
                 .call()
@@ -78,7 +79,7 @@ impl ValidSince {
     pub fn test_since_absolute_block_number(&self, node: &Node) {
         node.generate_block();
         let absolute: BlockNumber =
-            node.rpc_client().get_tip_block_number() + self.cellbase_maturity() + 5;
+            node.get_tip_block_number() + self.cellbase_maturity() + 5;
         let since = since_from_absolute_block_number(absolute);
         let transaction = {
             let cellbase = node.get_tip_block().transactions()[0].clone();
@@ -92,7 +93,7 @@ impl ValidSince {
         }
 
         // Failed to send transaction since SinceImmaturity
-        let tip_number = node.rpc_client().get_tip_block_number();
+        let tip_number = node.get_tip_block_number();
         for _ in tip_number + 1..absolute {
             assert_send_transaction_fail(node, &transaction, "InvalidTx(Immature)");
             node.generate_block();
@@ -100,7 +101,8 @@ impl ValidSince {
 
         // Success to send transaction after cellbase immaturity and since immaturity
         assert!(
-            node.rpc_client()
+            node
+                .rpc_client()
                 .inner()
                 .send_transaction((&transaction).into())
                 .call()
@@ -112,7 +114,7 @@ impl ValidSince {
     pub fn test_since_relative_median_time(&self, node: &Node) {
         node.generate_block();
         let cellbase = node.get_tip_block().transactions()[0].clone();
-        let old_median_time = node.rpc_client().get_blockchain_info().median_time.0;
+        let old_median_time = node.get_blockchain_info().median_time.0;
         sleep(Duration::from_secs(2));
 
         let n = max(self.cellbase_maturity(), MEDIAN_TIME_BLOCK_COUNT);
@@ -121,12 +123,11 @@ impl ValidSince {
         });
 
         // Calculate the current block median time
-        let tip_number = node.rpc_client().get_tip_block_number();
+        let tip_number = node.get_tip_block_number();
         let mut timestamps: Vec<u64> = (tip_number - MEDIAN_TIME_BLOCK_COUNT + 1..=tip_number)
             .map(|block_number| {
-                node.rpc_client()
+                node
                     .get_block_by_number(block_number)
-                    .unwrap()
                     .header()
                     .timestamp()
             })
@@ -145,7 +146,8 @@ impl ValidSince {
             let since = since_from_relative_timestamp(median_time_seconds - 1);
             let transaction = node.new_transaction_with_since(cellbase.hash().to_owned(), since);
             assert!(
-                node.rpc_client()
+                node
+                    .rpc_client()
                     .inner()
                     .send_transaction((&transaction).into())
                     .call()
@@ -164,12 +166,11 @@ impl ValidSince {
         });
 
         // Calculate current block median time
-        let tip_number = node.rpc_client().get_tip_block_number();
+        let tip_number = node.get_tip_block_number();
         let mut timestamps: Vec<u64> = ((tip_number - MEDIAN_TIME_BLOCK_COUNT + 1)..=tip_number)
             .map(|block_number| {
-                node.rpc_client()
+                node
                     .get_block_by_number(block_number)
-                    .unwrap()
                     .header()
                     .timestamp()
             })
@@ -188,7 +189,8 @@ impl ValidSince {
             let since = since_from_absolute_timestamp(median_time_seconds - 1);
             let transaction = node.new_transaction_with_since(cellbase.hash().to_owned(), since);
             assert!(
-                node.rpc_client()
+                node
+                    .rpc_client()
                     .inner()
                     .send_transaction((&transaction).into())
                     .call()
@@ -212,7 +214,7 @@ impl ValidSince {
 
         (0..relative_blocks - DEFAULT_TX_PROPOSAL_WINDOW.0).for_each(|i| {
             info!("Tx is immature in block N + {}", i);
-            let error = node.rpc_client().send_transaction(&tx);
+            let error = node.send_transaction(&tx);
             assert_regex_match(&error.to_string(), r"InvalidTx\(Immature\)");
             node.generate_block();
         });
@@ -221,7 +223,7 @@ impl ValidSince {
             "Tx will be added to pending pool in N + {} block",
             relative_blocks - DEFAULT_TX_PROPOSAL_WINDOW.0
         );
-        let tx_hash = node.rpc_client().send_transaction(&tx);
+        let tx_hash = node.send_transaction(&tx);
         assert_eq!(tx_hash, tx.hash().to_owned());
         node.assert_tx_pool_size(1, 0);
 
@@ -238,7 +240,7 @@ impl ValidSince {
         node.assert_tx_pool_size(0, 0);
 
         // test absolute block number since
-        let tip_number: BlockNumber = node.rpc_client().get_tip_block_number();
+        let tip_number: BlockNumber = node.get_tip_block_number();
         info!(
             "Use tip block {} cellbase as tx input with an absolute block number since",
             tip_number
@@ -251,7 +253,7 @@ impl ValidSince {
 
         (tip_number..absolute_block - DEFAULT_TX_PROPOSAL_WINDOW.0).for_each(|i| {
             info!("Tx is immature in block {}", i);
-            let error = node.rpc_client().send_transaction(&tx);
+            let error = node.send_transaction(&tx);
             assert_regex_match(&error.to_string(), r"InvalidTx\(Immature\)");
             node.generate_block();
         });
@@ -260,7 +262,7 @@ impl ValidSince {
             "Tx will be added to pending pool in {} block",
             absolute_block - DEFAULT_TX_PROPOSAL_WINDOW.0
         );
-        let tx_hash = node.rpc_client().send_transaction(&tx);
+        let tx_hash = node.send_transaction(&tx);
         assert_eq!(tx_hash, tx.hash().to_owned());
         node.assert_tx_pool_size(1, 0);
 

@@ -24,7 +24,7 @@ impl Spec for BlockSyncFromOne {
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
         let node1 = &net.nodes[1];
-        let (rpc_client0, rpc_client1) = (node0.rpc_client(), node1.rpc_client());
+        let (rpc_client0, rpc_client1) = (node0, node1);
         assert_eq!(0, rpc_client0.get_tip_block_number());
         assert_eq!(0, rpc_client1.get_tip_block_number());
 
@@ -61,7 +61,7 @@ impl Spec for BlockSyncForks {
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
         let node1 = &net.nodes[1];
-        let (rpc_client0, rpc_client1) = (node0.rpc_client(), node1.rpc_client());
+        let (rpc_client0, rpc_client1) = (node0, node1);
         assert_eq!(0, rpc_client0.get_tip_block_number());
         assert_eq!(0, rpc_client1.get_tip_block_number());
 
@@ -118,7 +118,7 @@ impl Spec for BlockSyncDuplicatedAndReconnect {
     // Case: Sync a header, sync a duplicated header, reconnect and sync a duplicated header
     fn run(&self, net: Net) {
         let node = &net.nodes[0];
-        let rpc_client = node.rpc_client();
+        let rpc_client = node;
         net.exit_ibd_mode();
         net.connect(node);
         let (peer_id, _, _) = net
@@ -199,7 +199,7 @@ impl Spec for BlockSyncOrphanBlocks {
         let (peer_id, _, _) = net
             .receive_timeout(Duration::new(10, 0))
             .expect("net receive timeout");
-        let rpc_client = node0.rpc_client();
+        let rpc_client = node0;
         let tip_number = rpc_client.get_tip_block_number();
 
         // Generate some blocks from node1
@@ -235,7 +235,7 @@ impl Spec for BlockSyncOrphanBlocks {
 }
 
 fn build_forks(node: &Node, offsets: &[u64]) {
-    let rpc_client = node.rpc_client();
+    let rpc_client = node;
     for offset in offsets.iter() {
         let mut template = rpc_client.get_block_template(None, None, None);
         template.current_time = Timestamp(template.current_time.0 + offset);

@@ -16,11 +16,7 @@ impl Spec for Disconnect {
         let node1 = net.nodes.pop().unwrap();
         std::mem::drop(node1);
 
-        let rpc_client = net.nodes[0].rpc_client();
-        let ret = wait_until(10, || {
-            let peers = rpc_client.get_peers();
-            peers.is_empty()
-        });
+        let ret = wait_until(10, || net.nodes[0].get_peers().is_empty());
         assert!(
             ret,
             "The address of node1 should be removed from node0's peers",

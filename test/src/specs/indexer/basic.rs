@@ -18,7 +18,7 @@ impl Spec for IndexerBasic {
 
         let tip_block = node0.get_tip_block();
         let lock_hash = tip_block.transactions()[0].outputs()[0].lock.hash();
-        let rpc_client = node0.rpc_client();
+        let rpc_client = node0;
 
         info!("Should return empty result before index the lock hash");
         let live_cells = rpc_client.get_live_cells_by_lock_hash(lock_hash.clone(), 0, 10, None);

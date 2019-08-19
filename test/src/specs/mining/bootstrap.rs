@@ -31,7 +31,7 @@ impl Spec for BootstrapCellbase {
         };
 
         let is_bootstrap_cellbase = |blk_hash: &H256| {
-            let blk = node.rpc_client().get_block(blk_hash.clone()).unwrap();
+            let blk = node.get_block(blk_hash.clone()).unwrap();
             blk.transactions()[0].is_cellbase()
                 && blk.transactions()[0].outputs()[0].lock == bootstrap_lock
         };
@@ -40,7 +40,7 @@ impl Spec for BootstrapCellbase {
 
         let hash = node.generate_block();
 
-        let blk = node.rpc_client().get_block(hash).unwrap();
+        let blk = node.get_block(hash).unwrap();
         assert!(
             blk.transactions()[0].is_cellbase()
                 && blk.transactions()[0].outputs()[0].lock == miner

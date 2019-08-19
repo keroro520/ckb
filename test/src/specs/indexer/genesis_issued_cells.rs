@@ -25,7 +25,7 @@ impl Spec for GenesisIssuedCells {
         }
         .hash();
         info!("{:x}", lock_hash);
-        let rpc_client = node0.rpc_client();
+        let rpc_client = node0;
 
         info!("Should return live cells and cell transactions of genesis issued cells");
         rpc_client.index_lock_hash(lock_hash.clone(), Some(0));

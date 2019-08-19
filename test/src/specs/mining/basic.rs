@@ -30,8 +30,8 @@ impl MiningBasic {
         let _ = node.generate_block(); // skip
         let block3_hash = node.generate_block();
 
-        let block1 = node.rpc_client().get_block(block1_hash).unwrap();
-        let block3 = node.rpc_client().get_block(block3_hash).unwrap();
+        let block1 = node.get_block(block1_hash).unwrap();
+        let block3 = node.get_block(block3_hash).unwrap();
 
         info!("Generated tx should be included in next block's proposal txs");
         assert!(block1
@@ -64,7 +64,7 @@ impl MiningBasic {
             std::mem::swap(&mut block1, &mut block2);
         }
 
-        let rpc_client = node.rpc_client();
+        let rpc_client = node;
         let block_hash1 = block1.header().hash().clone();
         assert_eq!(block_hash1, node.submit_block(&block1));
         assert_eq!(&block_hash1, rpc_client.get_tip_header().hash());

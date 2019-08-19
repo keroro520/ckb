@@ -277,13 +277,13 @@ fn ensure_committed(node: &Node, transaction: &Transaction) -> (OutPoint, H256) 
     // Ensure the transaction's cellbase-maturity and since-maturity
     node.generate_blocks(20);
 
-    let tx_hash = node.rpc_client().send_transaction(transaction);
+    let tx_hash = node.send_transaction(transaction);
 
     // Ensure the sent transaction is beyond the proposal-window
     node.generate_blocks(20);
 
     let tx_status = node
-        .rpc_client()
+        
         .get_transaction(tx_hash.clone())
         .expect("get sent transaction");
     assert!(
@@ -409,7 +409,7 @@ fn withdraw_dao_transaction(node: &Node, out_point: OutPoint, block_hash: H256) 
     };
     let (output, output_data) = {
         let input_capacities = node
-            .rpc_client()
+            
             .calculate_dao_maximum_withdraw(out_point, withdraw_header_hash.clone());
         withdraw_dao_output(input_capacities)
     };

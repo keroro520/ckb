@@ -53,16 +53,16 @@ impl Spec for AlertPropagation {
             .map(|s| Bytes::from(s.serialize()))
             .collect();
         // send alert
-        node0.rpc_client().send_alert(alert.clone());
+        node0.send_alert(alert.clone());
         info!("Waiting for alert relay");
         let ret = wait_until(20, || {
             net.nodes
                 .iter()
-                .all(|node| !node.rpc_client().get_blockchain_info().alerts.is_empty())
+                .all(|node| !node.get_blockchain_info().alerts.is_empty())
         });
         assert!(ret, "alert is relayed");
         for node in net.nodes.iter() {
-            let alerts = node.rpc_client().get_blockchain_info().alerts;
+            let alerts = node.get_blockchain_info().alerts;
             assert_eq!(alerts.len(), 1);
             assert_eq!(alerts[0].message, warning1);
         }
@@ -86,11 +86,11 @@ impl Spec for AlertPropagation {
             .iter()
             .map(|s| Bytes::from(s.serialize()))
             .collect();
-        node0.rpc_client().send_alert(alert2);
+        node0.send_alert(alert2);
         info!("Waiting for alert relay");
         let ret = wait_until(20, || {
             net.nodes.iter().all(|node| {
-                node.rpc_client()
+                node
                     .get_blockchain_info()
                     .alerts
                     .iter()
@@ -99,14 +99,14 @@ impl Spec for AlertPropagation {
         });
         assert!(ret, "alert is relayed");
         for node in net.nodes.iter() {
-            let alerts = node.rpc_client().get_blockchain_info().alerts;
+            let alerts = node.get_blockchain_info().alerts;
             assert_eq!(alerts.len(), 1);
             assert_eq!(alerts[0].message, warning2);
         }
 
         // send canceled alert again, should ignore by all nodes
-        node0.rpc_client().send_alert(alert);
-        let alerts = node0.rpc_client().get_blockchain_info().alerts;
+        node0.send_alert(alert);
+        let alerts = node0.get_blockchain_info().alerts;
         assert_eq!(alerts.len(), 1);
         assert_eq!(alerts[0].message, warning2);
     }
