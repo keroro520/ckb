@@ -23,12 +23,12 @@ impl MiningBasic {
     pub const BLOCK_TEMPLATE_TIMEOUT: u64 = 3;
 
     pub fn test_basic(&self, node: &Node) {
-        node.generate_block();
+        node.mine_block();
         info!("Use generated block's cellbase as tx input");
-        let transaction_hash = node.generate_transaction();
-        let block1_hash = node.generate_block();
-        let _ = node.generate_block(); // skip
-        let block3_hash = node.generate_block();
+        let transaction_hash = node.send_transaction_with_tip_cellbase();
+        let block1_hash = node.mine_block();
+        let _ = node.mine_block(); // skip
+        let block3_hash = node.mine_block();
 
         let block1 = node.get_block(block1_hash).unwrap();
         let block3 = node.get_block(block3_hash).unwrap();
@@ -47,10 +47,10 @@ impl MiningBasic {
     }
 
     pub fn test_block_template_cache(&self, node: &Node) {
-        let mut block1 = node.new_block(None, None, None);
+        let mut block1 = node.build_block(None, None, None);
         sleep(Duration::new(Self::BLOCK_TEMPLATE_TIMEOUT + 1, 0)); // Wait block timeout cache timeout
         let mut block2 = node
-            .new_block_builder(None, None, None)
+            .build_block_builder(None, None, None)
             .header_builder(
                 HeaderBuilder::from_header(block1.header().to_owned())
                     .timestamp(block1.header().timestamp() + 1),

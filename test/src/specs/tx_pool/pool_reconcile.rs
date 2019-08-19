@@ -13,17 +13,16 @@ impl Spec for PoolReconcile {
         let node1 = &net.nodes[1];
 
         info!("Generate 1 block on node0");
-        node0.generate_block();
+        node0.mine_block();
 
         info!("Use generated block's cellbase as tx input");
-        let hash = node0.generate_transaction();
+        let hash = node0.send_transaction_with_tip_cellbase();
 
         info!("Generate 3 more blocks on node0");
-        node0.generate_blocks(3);
+        node0.mine_blocks(3);
 
         info!("Pool should be empty");
         assert!(node0
-            
             .get_transaction(hash.clone())
             .unwrap()
             .tx_status
@@ -31,7 +30,7 @@ impl Spec for PoolReconcile {
             .is_some());
 
         info!("Generate 5 blocks on node1");
-        node1.generate_blocks(5);
+        node1.mine_blocks(5);
 
         info!("Connect node0 to node1");
         node0.connect(node1);
@@ -40,7 +39,6 @@ impl Spec for PoolReconcile {
 
         info!("Tx should be re-added to node0's pool");
         assert!(node0
-            
             .get_transaction(hash.clone())
             .unwrap()
             .tx_status

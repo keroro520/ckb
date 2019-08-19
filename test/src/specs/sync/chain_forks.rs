@@ -1,3 +1,4 @@
+use crate::utils::{connect_and_wait_ban, waiting_for_sync};
 use crate::{Net, Spec};
 use ckb_app_config::CKBAppConfig;
 use ckb_core::block::{Block, BlockBuilder};
@@ -22,18 +23,18 @@ impl Spec for ChainFork1 {
         let node1 = &net.nodes[1];
 
         info!("Generate 2 blocks (A, B) on node0");
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         info!("Connect node0 to node1");
         node1.connect(node0);
-        node0.waiting_for_sync(node1, 2);
+        waiting_for_sync(node0, node1, 2);
         info!("Disconnect node1");
         node0.disconnect(node1);
 
         info!("Generate 1 block (C) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         info!("Generate 2 blocks (D, E) on node1");
-        node1.generate_blocks(2);
+        node1.mine_blocks(2);
 
         info!("Reconnect node0 to node1");
         node0.connect(node1);
@@ -64,7 +65,7 @@ impl Spec for ChainFork2 {
         let node2 = &net.nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         info!("Connect all nodes");
         node1.connect(node0);
@@ -74,20 +75,20 @@ impl Spec for ChainFork2 {
         net.disconnect_all();
 
         info!("Generate 1 block (C) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         node0.connect(node2);
-        node0.waiting_for_sync(node2, 3);
+        waiting_for_sync(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
         info!("Generate 2 blocks (D, E) on node1");
-        node1.generate_blocks(2);
+        node1.mine_blocks(2);
         info!("Reconnect node1");
         node0.connect(node1);
-        node0.waiting_for_sync(node1, 4);
+        waiting_for_sync(node0, node1, 4);
 
         info!("Generate 2 blocks (F, G) on node2");
-        node2.generate_blocks(2);
+        node2.mine_blocks(2);
         info!("Reconnect node2");
         node0.connect(node2);
         node1.connect(node2);
@@ -113,7 +114,7 @@ impl Spec for ChainFork3 {
         let node2 = &net.nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         info!("Connect all nodes");
         node1.connect(node0);
@@ -124,16 +125,16 @@ impl Spec for ChainFork3 {
         net.disconnect_all();
 
         info!("Generate 1 block (C) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         node0.connect(node2);
-        node0.waiting_for_sync(node2, 3);
+        waiting_for_sync(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
         info!("Generate 2 blocks (D, E) on node1");
-        node1.generate_blocks(2);
+        node1.mine_blocks(2);
         info!("Generate 1 block (F) with invalid reward cellbase on node1");
-        let block = node1.new_block(None, None, None);
+        let block = node1.build_block(None, None, None);
         let invalid_block = modify_block_transaction(block, 0, |transaction| {
             let mut output = transaction.outputs()[0].clone();
             output.capacity = output.capacity.safe_add(capacity_bytes!(1)).unwrap();
@@ -143,17 +144,17 @@ impl Spec for ChainFork3 {
                 .build()
         });
         node1.process_block_without_verify(&invalid_block);
-        assert_eq!(5, node1.get_tip_block_number());
+        assert_eq!(5, node1.tip_number());
 
         info!("Reconnect node1 and node1 should be banned");
-        node0.connect_and_wait_ban(node1);
+        connect_and_wait_ban(node0, node1);
 
         info!("Generate 1 block (G) on node2");
-        node2.generate_blocks(1);
+        node2.mine_blocks(1);
         info!("Reconnect node2");
         node2.connect(node0);
-        node2.connect_and_wait_ban(node1);
-        node0.waiting_for_sync(node2, 4);
+        connect_and_wait_ban(node2, node1);
+        waiting_for_sync(node0, node2, 4);
     }
 }
 
@@ -175,7 +176,7 @@ impl Spec for ChainFork4 {
         let node2 = &net.nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         info!("Connect all nodes");
         node1.connect(node0);
@@ -186,16 +187,16 @@ impl Spec for ChainFork4 {
         net.disconnect_all();
 
         info!("Generate 1 block (C) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         node0.connect(node2);
-        node0.waiting_for_sync(node2, 3);
+        waiting_for_sync(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
         info!("Generate 2 blocks (D, E) on node1");
-        node1.generate_blocks(2);
+        node1.mine_blocks(2);
         info!("Generate 1 block (F) with capacity overflow cellbase on node1");
-        let block = node1.new_block(None, None, None);
+        let block = node1.build_block(None, None, None);
         let invalid_block = modify_block_transaction(block, 0, |transaction| {
             let mut output = transaction.outputs()[0].clone();
             output.capacity = capacity_bytes!(1);
@@ -205,17 +206,17 @@ impl Spec for ChainFork4 {
                 .build()
         });
         node1.process_block_without_verify(&invalid_block);
-        assert_eq!(5, node1.get_tip_block_number());
+        assert_eq!(5, node1.tip_number());
 
         info!("Reconnect node1 and node1 should be banned");
-        node0.connect_and_wait_ban(node1);
+        connect_and_wait_ban(node0, node1);
 
         info!("Generate 1 block (G) on node2");
-        node2.generate_blocks(1);
+        node2.mine_blocks(1);
         info!("Reconnect node2");
         node2.connect(node0);
-        node2.connect_and_wait_ban(node1);
-        node0.waiting_for_sync(node2, 4);
+        connect_and_wait_ban(node2, node1);
+        waiting_for_sync(node0, node2, 4);
     }
 }
 
@@ -237,11 +238,11 @@ impl Spec for ChainFork5 {
         let node2 = &net.nodes[2];
 
         info!("Generate 1 block (A) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         info!("Generate 1 block (B) on node0, proposal spent A cellbase transaction");
-        let transaction = node0.new_transaction_spend_tip_cellbase();
+        let transaction = node0.build_transaction_with_tip_cellbase();
         node0.send_transaction(&transaction);
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         info!("Connect all nodes");
         node1.connect(node0);
         node2.connect(node0);
@@ -251,37 +252,37 @@ impl Spec for ChainFork5 {
         net.disconnect_all();
 
         info!("Generate 1 block (C) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         node0.connect(node2);
-        node0.waiting_for_sync(node2, 3);
+        waiting_for_sync(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
         info!("Generate 1 blocks (D) on node1");
-        node1.generate_blocks(1);
+        node1.mine_blocks(1);
         info!("Generate 1 blocks (E) with transaction on node1");
-        let block = BlockBuilder::from_block(node1.new_block(None, None, None))
+        let block = BlockBuilder::from_block(node1.build_block(None, None, None))
             .transaction(transaction.clone())
             .build();
         node1.submit_block(&block);
-        assert_eq!(4, node1.get_tip_block_number());
+        assert_eq!(4, node1.tip_number());
         info!("Generate 1 blocks (F) with spent transaction on node1");
-        let block = node1.new_block(None, None, None);
+        let block = node1.build_block(None, None, None);
         let invalid_block = BlockBuilder::from_block(block)
             .transaction(transaction)
             .build();
         node1.process_block_without_verify(&invalid_block);
-        assert_eq!(5, node1.get_tip_block_number());
+        assert_eq!(5, node1.tip_number());
 
         info!("Reconnect node1 and node1 should be banned");
-        node0.connect_and_wait_ban(node1);
+        connect_and_wait_ban(node0, node1);
 
         info!("Generate 1 block (G) on node2");
-        node2.generate_blocks(1);
+        node2.mine_blocks(1);
         info!("Reconnect node2");
         node2.connect(node0);
-        node2.connect_and_wait_ban(node1);
-        node0.waiting_for_sync(node2, 4);
+        connect_and_wait_ban(node2, node1);
+        waiting_for_sync(node0, node2, 4);
     }
 }
 
@@ -303,7 +304,7 @@ impl Spec for ChainFork6 {
         let node2 = &net.nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         info!("Connect all nodes");
         node1.connect(node0);
@@ -314,32 +315,32 @@ impl Spec for ChainFork6 {
         net.disconnect_all();
 
         info!("Generate 1 block (C) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         node0.connect(node2);
-        node0.waiting_for_sync(node2, 3);
+        waiting_for_sync(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
         info!("Generate 2 blocks (D, E) on node1");
-        node1.generate_blocks(2);
+        node1.mine_blocks(2);
         info!("Generate 1 block (F) with spending non-existent transaction on node1");
-        let block = node1.new_block(None, None, None);
-        let invalid_transaction = node1.new_transaction(h256!("0x1"));
+        let block = node1.build_block(None, None, None);
+        let invalid_transaction = node1.build_transaction_with_hash(h256!("0x1"));
         let invalid_block = BlockBuilder::from_block(block)
             .transaction(invalid_transaction)
             .build();
         node1.process_block_without_verify(&invalid_block);
-        assert_eq!(5, node1.get_tip_block_number());
+        assert_eq!(5, node1.tip_number());
 
         info!("Reconnect node1 and node1 should be banned");
-        node0.connect_and_wait_ban(node1);
+        connect_and_wait_ban(node0, node1);
 
         info!("Generate 1 block (G) on node2");
-        node2.generate_blocks(1);
+        node2.mine_blocks(1);
         info!("Reconnect node2");
         node2.connect(node0);
-        node2.connect_and_wait_ban(node1);
-        node0.waiting_for_sync(node2, 4);
+        connect_and_wait_ban(node2, node1);
+        waiting_for_sync(node0, node2, 4);
     }
 }
 
@@ -361,7 +362,7 @@ impl Spec for ChainFork7 {
         let node2 = &net.nodes[2];
 
         info!("Generate 2 blocks (A, B) on node0");
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         info!("Connect all nodes");
         node1.connect(node0);
@@ -372,17 +373,17 @@ impl Spec for ChainFork7 {
         net.disconnect_all();
 
         info!("Generate 1 block (C) on node0");
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
         node0.connect(node2);
-        node0.waiting_for_sync(node2, 3);
+        waiting_for_sync(node0, node2, 3);
         info!("Disconnect node2");
         node0.disconnect(node2);
 
         info!("Generate 2 blocks (D, E) on node1");
-        node1.generate_blocks(2);
+        node1.mine_blocks(2);
         info!("Generate 1 block (F) with spending invalid index transaction on node1");
-        let block = node1.new_block(None, None, None);
-        let transaction = node1.new_transaction_spend_tip_cellbase();
+        let block = node1.build_block(None, None, None);
+        let transaction = node1.build_transaction_with_tip_cellbase();
         let mut input = transaction.inputs()[0].clone();
         input.previous_output.index = 999;
         let invalid_transaction = TransactionBuilder::from_transaction(transaction)
@@ -393,17 +394,17 @@ impl Spec for ChainFork7 {
             .transaction(invalid_transaction)
             .build();
         node1.process_block_without_verify(&invalid_block);
-        assert_eq!(5, node1.get_tip_block_number());
+        assert_eq!(5, node1.tip_number());
 
         info!("Reconnect node1 and node1 should be banned");
-        node0.connect_and_wait_ban(node1);
+        connect_and_wait_ban(node0, node1);
 
         info!("Generate 1 block (G) on node2");
-        node2.generate_blocks(1);
+        node2.mine_blocks(1);
         info!("Reconnect node2");
         node2.connect(node0);
-        node2.connect_and_wait_ban(node1);
-        node0.waiting_for_sync(node2, 4);
+        connect_and_wait_ban(node2, node1);
+        waiting_for_sync(node0, node2, 4);
     }
 }
 

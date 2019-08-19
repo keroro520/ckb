@@ -90,8 +90,7 @@ impl Spec for AlertPropagation {
         info!("Waiting for alert relay");
         let ret = wait_until(20, || {
             net.nodes.iter().all(|node| {
-                node
-                    .get_blockchain_info()
+                node.get_blockchain_info()
                     .alerts
                     .iter()
                     .all(|a| a.id.0 != id1)

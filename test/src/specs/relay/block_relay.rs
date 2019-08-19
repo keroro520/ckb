@@ -16,7 +16,7 @@ impl Spec for BlockRelayBasic {
         let node2 = &net.nodes[2];
 
         info!("Generate new block on node1");
-        let hash = node1.generate_block();
+        let hash = node1.mine_block();
 
         let rpc_client = node0;
         let ret = wait_until(10, || rpc_client.get_block(hash.clone()).is_some());

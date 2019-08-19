@@ -28,7 +28,7 @@ impl Spec for IBDProcess {
         // will never connect
         node0.connect_uncheck(node5);
         node0.connect_uncheck(node6);
-        node0.generate_blocks(1);
+        node0.mine_blocks(1);
 
         sleep(Duration::from_secs(5));
 

@@ -14,9 +14,9 @@ use numext_fixed_hash::H256;
 use std::convert::Into;
 use std::fs;
 use std::io::Error;
+use std::ops::Deref;
 use std::path::Path;
 use std::process::{self, Child, Command, Stdio};
-use std::ops::Deref;
 
 pub struct Node {
     binary: String,
@@ -24,7 +24,7 @@ pub struct Node {
     p2p_port: u16,
     rpc_port: u16,
     rpc_client: RpcClient,
-    node_id: Option<String>,
+    node_id: String,
     consensus: Consensus,
     guard: Option<ProcessGuard>,
 }
@@ -57,13 +57,13 @@ impl Node {
             p2p_port,
             rpc_port,
             rpc_client,
-            node_id: None,
-            guard: None,
+            node_id: Default::default(),
             consensus: Default::default(),
+            guard: None,
         }
     }
 
-    pub fn node_id(&self) -> &Option<String> {
+    pub fn node_id(&self) -> &String {
         &self.node_id
     }
 
@@ -85,6 +85,18 @@ impl Node {
         self.consensus().genesis_block().transactions()[0].outputs()[1]
             .data_hash()
             .to_owned()
+    }
+
+    pub fn always_success_script(&self) -> Script {
+        Script::new(
+            Vec::new(),
+            self.always_success_code_hash(),
+            ScriptHashType::Data,
+        )
+    }
+
+    pub fn always_success_out_point(&self) -> OutPoint {
+        OutPoint::new(self.genesis_cellbase_hash(), 1)
     }
 
     pub fn start(
@@ -109,7 +121,7 @@ impl Node {
         loop {
             let result = { self.rpc_client().inner().local_node_info().call() };
             if let Ok(local_node_info) = result {
-                self.node_id = Some(local_node_info.node_id);
+                self.node_id = local_node_info.node_id;
                 let _ = self.tx_pool_info();
                 break;
             } else if let Some(ref mut child) = self.guard {
@@ -159,40 +171,6 @@ impl Node {
         );
     }
 
-    // workaround for banned address checking (because we are using loopback address)
-    // 1. checking banned addresses is empty
-    // 2. connecting outbound peer and checking banned addresses is not empty
-    // 3. clear banned addresses
-    pub fn connect_and_wait_ban(&self, outbound_peer: &Node) {
-        let node_info = outbound_peer.local_node_info();
-        let node_id = node_info.node_id;
-
-        assert!(
-            self.get_banned_addresses().is_empty(),
-            "banned addresses should be empty"
-        );
-        self.add_node(
-            node_id.clone(),
-            format!("/ip4/127.0.0.1/tcp/{}", outbound_peer.p2p_port),
-        );
-
-        let result = wait_until(10, || {
-            let banned_addresses = self.get_banned_addresses();
-            let result = banned_addresses.is_empty();
-            banned_addresses.into_iter().for_each(|ban_address| {
-                self.set_ban(ban_address.address, "delete".to_owned(), None, None, None)
-            });
-            result
-        });
-
-        if !result {
-            panic!(
-                "Connect and wait ban outbound peer timeout, node id: {}",
-                node_id
-            );
-        }
-    }
-
     pub fn disconnect(&self, node: &Node) {
         let node_info = node.local_node_info();
 
@@ -209,100 +187,114 @@ impl Node {
         }
     }
 
-    pub fn waiting_for_sync(&self, node: &Node, target: BlockNumber) {
-        let (mut self_tip_number, mut node_tip_number) = (0, 0);
-        // 60 seconds is a reasonable timeout to sync, even for poor CI server
-        let result = wait_until(60, || {
-            self_tip_number = self.get_tip_block_number();
-            node_tip_number = node.get_tip_block_number();
-            self_tip_number == node_tip_number && target == self_tip_number
-        });
-
-        if !result {
-            panic!(
-                "Waiting for sync timeout, self_tip_number: {}, node_tip_number: {}",
-                self_tip_number, node_tip_number
-            );
-        }
-    }
-
     pub fn rpc_client(&self) -> &RpcClient {
         &self.rpc_client
     }
 
+    /// Return the tip block
+    pub fn tip_block(&self) -> Block {
+        self.get_block_by_number(self.tip_number())
+    }
+
+    /// Return the tip block number
+    pub fn tip_number(&self) -> BlockNumber {
+        self.get_tip_block_number()
+    }
+
+    /// Return the out-point of the cellbase of the tip block
+    pub fn tip_cellbase_out_point(&self) -> OutPoint {
+        let tx_hash = self.tip_block().transactions()[0].hash().to_owned();
+        OutPoint::new(tx_hash, 0)
+    }
+
+    /// Build and submit an always-success transaction which spend the tip cellbase
+    pub fn send_transaction_with_tip_cellbase(&self) -> H256 {
+        let transaction = self.build_transaction_with_tip_cellbase();
+        self.send_transaction(&transaction)
+    }
+
+    /// Build an always-success transaction which spend the tip cellbase
+    pub fn build_transaction_with_tip_cellbase(&self) -> Transaction {
+        let tx_hash = self.tip_cellbase_out_point().tx_hash;
+        self.build_transaction_with_hash(tx_hash)
+    }
+
+    /// Build an always-success transaction which spend the 1st output of the given `tx_hash`,
+    /// and with since = 0
+    pub fn build_transaction_with_hash(&self, tx_hash: H256) -> Transaction {
+        let out_point = OutPoint::new(tx_hash, 0);
+        let previous_input = CellInput::new(out_point, 0);
+        self.build_transaction(previous_input)
+    }
+
+    /// Build an always-success transaction which:
+    ///   - input is the given parameter
+    ///   - output's capacity is 100
+    ///   - output's data is empty
+    ///   - output's lock script is always-success script
+    pub fn build_transaction(&self, previous_input: CellInput) -> Transaction {
+        const ALWAYS_OUTPUT_CAPACITY: Capacity = capacity_bytes!(100);
+
+        let always_success_out_point = self.always_success_out_point();
+        let always_success_script = self.always_success_script();
+        TransactionBuilder::default()
+            .cell_dep(CellDep::new_cell(always_success_out_point))
+            .output(
+                CellOutputBuilder::default()
+                    .capacity(ALWAYS_OUTPUT_CAPACITY)
+                    .lock(always_success_script)
+                    .build(),
+            )
+            .output_data(Bytes::new())
+            .input(previous_input)
+            .build()
+    }
+
+    /// Submit the given block
     pub fn submit_block(&self, block: &Block) -> H256 {
         self.rpc_client()
             .submit_block("".to_owned(), block)
             .expect("submit block")
     }
 
-    pub fn generate_blocks(&self, blocks_num: usize) -> Vec<H256> {
-        (0..blocks_num).map(|_| self.generate_block()).collect()
+    /// Mine the next given number of blocks
+    ///
+    /// Poll block-templates from CKB and submit the new corresponding blocks continuously
+    pub fn mine_blocks(&self, blocks_count: usize) -> Vec<H256> {
+        (0..blocks_count).map(|_| self.mine_block()).collect()
     }
 
-    // generate a new block and submit it through rpc.
-    pub fn generate_block(&self) -> H256 {
-        self.submit_block(&self.new_block(None, None, None))
+    /// Mine the next block
+    ///
+    /// Poll the next block-template from CKB and submit the new corresponding block
+    pub fn mine_block(&self) -> H256 {
+        self.submit_block(&self.build_block(None, None, None))
     }
 
-    // generate a transaction which spend tip block's cellbase and send it to pool through rpc.
-    pub fn generate_transaction(&self) -> H256 {
-        self.send_transaction(&self.new_transaction_spend_tip_cellbase())
-    }
-
-    // generate a transaction which spend tip block's cellbase
-    pub fn new_transaction_spend_tip_cellbase(&self) -> Transaction {
-        let block = self.get_tip_block();
-        let cellbase = &block.transactions()[0];
-        self.new_transaction(cellbase.hash().to_owned())
-    }
-
-    pub fn get_tip_block(&self) -> Block {
-        self.get_block_by_number(self.get_tip_block_number())
-    }
-
-    pub fn new_block(
+    /// Build the next block
+    ///
+    /// Poll the next block-template and convert it into block
+    pub fn build_block(
         &self,
         bytes_limit: Option<u64>,
         proposals_limit: Option<u64>,
         max_version: Option<u32>,
     ) -> Block {
-        self.new_block_builder(bytes_limit, proposals_limit, max_version)
+        self.build_block_builder(bytes_limit, proposals_limit, max_version)
             .build()
     }
 
-    pub fn new_block_builder(
+    /// Build the block-builder of the next block
+    ///
+    /// Poll the next block-template and convert it into BlockBuilder
+    pub fn build_block_builder(
         &self,
         bytes_limit: Option<u64>,
         proposals_limit: Option<u64>,
         max_version: Option<u32>,
     ) -> BlockBuilder {
-        self.get_block_template(bytes_limit, proposals_limit, max_version).into()
-    }
-
-    pub fn new_transaction(&self, hash: H256) -> Transaction {
-        self.new_transaction_with_since(hash, 0)
-    }
-
-    pub fn new_transaction_with_since(&self, hash: H256, since: u64) -> Transaction {
-        let always_success_out_point = OutPoint::new(self.genesis_cellbase_hash(), 1);
-        let always_success_script = Script::new(
-            vec![],
-            self.always_success_code_hash(),
-            ScriptHashType::Data,
-        );
-
-        TransactionBuilder::default()
-            .cell_dep(CellDep::new_cell(always_success_out_point))
-            .output(
-                CellOutputBuilder::default()
-                    .capacity(capacity_bytes!(100))
-                    .lock(always_success_script)
-                    .build(),
-            )
-            .output_data(Bytes::new())
-            .input(CellInput::new(OutPoint::new(hash, 0), since))
-            .build()
+        self.get_block_template(bytes_limit, proposals_limit, max_version)
+            .into()
     }
 
     fn prepare_chain_spec(
@@ -385,17 +377,5 @@ impl Node {
         self.prepare_chain_spec(modify_chain_spec)?;
         self.rewrite_spec(modify_ckb_config)?;
         Ok(())
-    }
-
-    pub fn assert_tx_pool_size(&self, pending_size: u64, proposed_size: u64) {
-        let tx_pool_info = self.tx_pool_info();
-        assert_eq!(tx_pool_info.pending.0, pending_size);
-        assert_eq!(tx_pool_info.proposed.0, proposed_size);
-    }
-
-    pub fn assert_tx_pool_statics(&self, total_tx_size: u64, total_tx_cycles: u64) {
-        let tx_pool_info = self.tx_pool_info();
-        assert_eq!(tx_pool_info.total_tx_size.0, total_tx_size);
-        assert_eq!(tx_pool_info.total_tx_cycles.0, total_tx_cycles);
     }
 }

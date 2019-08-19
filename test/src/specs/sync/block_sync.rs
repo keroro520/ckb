@@ -25,11 +25,11 @@ impl Spec for BlockSyncFromOne {
         let node0 = &net.nodes[0];
         let node1 = &net.nodes[1];
         let (rpc_client0, rpc_client1) = (node0, node1);
-        assert_eq!(0, rpc_client0.get_tip_block_number());
-        assert_eq!(0, rpc_client1.get_tip_block_number());
+        assert_eq!(0, rpc_client0.tip_number());
+        assert_eq!(0, rpc_client1.tip_number());
 
         (0..3).for_each(|_| {
-            node0.generate_block();
+            node0.mine_block();
         });
 
         node1.connect(node0);
@@ -62,8 +62,8 @@ impl Spec for BlockSyncForks {
         let node0 = &net.nodes[0];
         let node1 = &net.nodes[1];
         let (rpc_client0, rpc_client1) = (node0, node1);
-        assert_eq!(0, rpc_client0.get_tip_block_number());
-        assert_eq!(0, rpc_client1.get_tip_block_number());
+        assert_eq!(0, rpc_client0.tip_number());
+        assert_eq!(0, rpc_client1.tip_number());
 
         build_forks(node0, &[2, 0, 0, 0, 0, 0, 0, 0, 0]);
         build_forks(node1, &[1, 0, 0, 0, 0, 0, 0, 0, 0]);
@@ -126,7 +126,7 @@ impl Spec for BlockSyncDuplicatedAndReconnect {
             .expect("build connection with node");
 
         // Sync a new header to `node`, `node` should send back a corresponding GetBlocks message
-        let block = node.new_block(None, None, None);
+        let block = node.build_block(None, None, None);
         sync_header(&net, peer_id, &block);
         let (_, _, data) = net
             .receive_timeout(Duration::new(10, 0))
@@ -200,12 +200,12 @@ impl Spec for BlockSyncOrphanBlocks {
             .receive_timeout(Duration::new(10, 0))
             .expect("net receive timeout");
         let rpc_client = node0;
-        let tip_number = rpc_client.get_tip_block_number();
+        let tip_number = rpc_client.tip_number();
 
         // Generate some blocks from node1
         let mut blocks: Vec<Block> = (1..=5)
             .map(|_| {
-                let block = node1.new_block(None, None, None);
+                let block = node1.build_block(None, None, None);
                 node1.submit_block(&block);
                 block
             })
@@ -224,12 +224,12 @@ impl Spec for BlockSyncOrphanBlocks {
         blocks.into_iter().for_each(|block| {
             sync_block(&net, peer_id, &block);
         });
-        let ret = wait_until(5, || rpc_client.get_tip_block_number() > tip_number);
+        let ret = wait_until(5, || rpc_client.tip_number() > tip_number);
         assert!(!ret, "node0 should stay the same");
 
         // Send that skipped first block to node0
         sync_block(&net, peer_id, &first);
-        let ret = wait_until(10, || rpc_client.get_tip_block_number() > tip_number + 2);
+        let ret = wait_until(10, || rpc_client.tip_number() > tip_number + 2);
         assert!(ret, "node0 should grow up");
     }
 }

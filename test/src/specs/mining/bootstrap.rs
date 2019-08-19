@@ -15,7 +15,7 @@ impl Spec for BootstrapCellbase {
         let node = &net.nodes[0];
 
         let blk_hashes: Vec<_> = (0..=DEFAULT_TX_PROPOSAL_WINDOW.1)
-            .map(|_| node.generate_block())
+            .map(|_| node.mine_block())
             .collect();
 
         let bootstrap_lock = CoreScript {
@@ -38,7 +38,7 @@ impl Spec for BootstrapCellbase {
 
         assert!(blk_hashes.iter().all(is_bootstrap_cellbase));
 
-        let hash = node.generate_block();
+        let hash = node.mine_block();
 
         let blk = node.get_block(hash).unwrap();
         assert!(

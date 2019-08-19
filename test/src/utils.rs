@@ -161,3 +161,66 @@ pub fn is_committed(tx_status: &TransactionWithStatus) -> bool {
     let committed_status = TxStatus::committed(H256::zero());
     tx_status.tx_status.status == committed_status.status
 }
+
+pub fn assert_tx_pool_size(node: &Node, pending_size: u64, proposed_size: u64) {
+    let tx_pool_info = node.tx_pool_info();
+    assert_eq!(tx_pool_info.pending.0, pending_size);
+    assert_eq!(tx_pool_info.proposed.0, proposed_size);
+}
+
+pub fn assert_tx_pool_statics(node: &Node, total_tx_size: u64, total_tx_cycles: u64) {
+    let tx_pool_info = node.tx_pool_info();
+    assert_eq!(tx_pool_info.total_tx_size.0, total_tx_size);
+    assert_eq!(tx_pool_info.total_tx_cycles.0, total_tx_cycles);
+}
+
+// workaround for banned address checking (because we are using loopback address)
+// 1. checking banned addresses is empty
+// 2. connecting outbound peer and checking banned addresses is not empty
+// 3. clear banned addresses
+pub fn connect_and_wait_ban(inbound: &Node, outbound: &Node) {
+    let node_info = outbound.local_node_info();
+    let node_id = node_info.node_id;
+
+    assert!(
+        inbound.get_banned_addresses().is_empty(),
+        "banned addresses should be empty"
+    );
+    inbound.add_node(
+        node_id.clone(),
+        format!("/ip4/127.0.0.1/tcp/{}", outbound.p2p_port()),
+    );
+
+    let result = wait_until(10, || {
+        let banned_addresses = inbound.get_banned_addresses();
+        let result = banned_addresses.is_empty();
+        banned_addresses.into_iter().for_each(|ban_address| {
+            inbound.set_ban(ban_address.address, "delete".to_owned(), None, None, None)
+        });
+        result
+    });
+
+    if !result {
+        panic!(
+            "Connect and wait ban outbound peer timeout, node id: {}",
+            node_id
+        );
+    }
+}
+
+pub fn waiting_for_sync(node0: &Node, node1: &Node, target: BlockNumber) {
+    let (mut self_tip_number, mut node_tip_number) = (0, 0);
+    // 60 seconds is a reasonable timeout to sync, even for poor CI server
+    let result = wait_until(60, || {
+        self_tip_number = node0.tip_number();
+        node_tip_number = node1.tip_number();
+        self_tip_number == node_tip_number && target == self_tip_number
+    });
+
+    if !result {
+        panic!(
+            "Waiting for sync timeout, self_tip_number: {}, node_tip_number: {}",
+            self_tip_number, node_tip_number
+        );
+    }
+}

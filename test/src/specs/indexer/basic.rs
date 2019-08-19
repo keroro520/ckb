@@ -1,4 +1,4 @@
-use crate::utils::wait_until;
+use crate::utils::{wait_until, waiting_for_sync};
 use crate::{Net, Spec};
 use log::info;
 
@@ -14,9 +14,9 @@ impl Spec for IndexerBasic {
         let node1 = &net.nodes[1];
 
         info!("Generate 1 block on node0");
-        node0.generate_block();
+        node0.mine_block();
 
-        let tip_block = node0.get_tip_block();
+        let tip_block = node0.tip_block();
         let lock_hash = tip_block.transactions()[0].outputs()[0].lock.hash();
         let rpc_client = node0;
 
@@ -41,17 +41,17 @@ impl Spec for IndexerBasic {
 
         info!("Generate 6 txs on node0");
         let mut txs_hash = Vec::new();
-        let mut hash = node0.generate_transaction();
+        let mut hash = node0.send_transaction_with_tip_cellbase();
         txs_hash.push(hash.clone());
 
         (0..5).for_each(|_| {
-            let tx = node0.new_transaction(hash.clone());
+            let tx = node0.build_transaction_with_hash(hash.clone());
             hash = rpc_client.send_transaction(&tx);
             txs_hash.push(hash.clone());
         });
 
         info!("Generate 3 more blocks on node0 to commit 6 txs");
-        node0.generate_blocks(3);
+        node0.mine_blocks(3);
         info!(
             "Live cells size should be 4 (1 + 3), cell transactions size should be 10 (1 + 6 + 3)"
         );
@@ -75,9 +75,9 @@ impl Spec for IndexerBasic {
         assert_eq!(tip_number, cell_transactions[0].created_by.block_number.0);
 
         info!("Generate 5 blocks on node1 and connect node0 to switch fork");
-        node1.generate_blocks(5);
+        node1.mine_blocks(5);
         node0.connect(node1);
-        node0.waiting_for_sync(node1, 5);
+        waiting_for_sync(node0, node1, 5);
         info!("Live cells size should be 5, cell transactions size should be 5");
         let result = wait_until(5, || {
             let live_cells = rpc_client.get_live_cells_by_lock_hash(lock_hash.clone(), 0, 20, None);

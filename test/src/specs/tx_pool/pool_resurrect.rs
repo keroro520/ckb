@@ -1,3 +1,4 @@
+use crate::utils::assert_tx_pool_size;
 use crate::{Net, Spec};
 use log::info;
 
@@ -13,42 +14,42 @@ impl Spec for PoolResurrect {
         let node1 = &net.nodes[1];
 
         info!("Generate 1 block on node0");
-        node0.generate_block();
+        node0.mine_block();
 
         info!("Generate 6 txs on node0");
         let mut txs_hash = Vec::new();
-        let mut hash = node0.generate_transaction();
+        let mut hash = node0.send_transaction_with_tip_cellbase();
         txs_hash.push(hash.clone());
 
         (0..5).for_each(|_| {
-            let tx = node0.new_transaction(hash.clone());
+            let tx = node0.build_transaction_with_hash(hash.clone());
             hash = node0.send_transaction(&tx);
             txs_hash.push(hash.clone());
         });
 
         info!("Generate 3 more blocks on node0");
-        node0.generate_blocks(3);
+        node0.mine_blocks(3);
 
         info!("Pool should be empty");
         let tx_pool_info = node0.tx_pool_info();
         assert!(tx_pool_info.pending.0 == 0);
 
         info!("Generate 5 blocks on node1");
-        node1.generate_blocks(5);
+        node1.mine_blocks(5);
 
         info!("Connect node0 to node1, waiting for sync");
         node0.connect(node1);
         net.waiting_for_sync(5);
 
         info!("6 txs should be returned to node0 pending pool");
-        node0.assert_tx_pool_size(txs_hash.len() as u64, 0);
+        assert_tx_pool_size(node0, txs_hash.len() as u64, 0);
 
         info!("Generate 2 blocks on node0, 6 txs should be added to proposed pool");
-        node0.generate_blocks(2);
-        node0.assert_tx_pool_size(0, txs_hash.len() as u64);
+        node0.mine_blocks(2);
+        assert_tx_pool_size(node0, 0, txs_hash.len() as u64);
 
         info!("Generate 1 block on node0, 6 txs should be included in this block");
-        node0.generate_block();
-        node0.assert_tx_pool_size(0, 0);
+        node0.mine_block();
+        assert_tx_pool_size(node0, 0, 0);
     }
 }

@@ -21,7 +21,7 @@ impl Spec for DepositDAO {
 
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         // Deposit DAO
         {
@@ -34,7 +34,7 @@ impl Spec for DepositDAO {
             // deposit dao transaction without `block_hash`
             let transaction = {
                 let out_point_without_block_hash = {
-                    let tx_hash = node0.get_tip_block().transactions()[0].hash().to_owned();
+                    let tx_hash = node0.tip_block().transactions()[0].hash().to_owned();
                     OutPoint::new(tx_hash, 0)
                 };
                 TransactionBuilder::from_transaction(deposit_dao_transaction(node0))
@@ -54,7 +54,7 @@ impl Spec for WithdrawDAO {
 
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         let deposited = {
             let transaction = deposit_dao_transaction(node0);
@@ -72,7 +72,7 @@ impl Spec for WithdrawAndDepositDAOWithinSameTx {
 
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         let mut deposited = {
             let transaction = deposit_dao_transaction(node0);
@@ -109,10 +109,10 @@ impl Spec for WithdrawDAOWithNotMaturitySince {
 
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         let not_maturity = |node: &Node, previous_output: OutPoint| {
-            let not_maturity_since = node.get_tip_block_number();
+            let not_maturity_since = node.tip_number();
             CellInput::new(previous_output, not_maturity_since)
         };
 
@@ -132,7 +132,7 @@ impl Spec for WithdrawDAOWithNotMaturitySince {
                 .inputs(inputs)
                 .build()
         };
-        node0.generate_blocks(20);
+        node0.mine_blocks(20);
         assert_send_transaction_fail(
             node0,
             &transaction,
@@ -148,7 +148,7 @@ impl Spec for WithdrawDAOWithOverflowCapacity {
 
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         let deposited = {
             let transaction = deposit_dao_transaction(node0);
@@ -171,7 +171,7 @@ impl Spec for WithdrawDAOWithOverflowCapacity {
                 .outputs(outputs)
                 .build()
         };
-        node0.generate_blocks(20);
+        node0.mine_blocks(20);
         // Withdraw DAO with empty witnesses. Return DAO script ERROR_INCORRECT_CAPACITY
         assert_send_transaction_fail(
             node0,
@@ -188,7 +188,7 @@ impl Spec for WithdrawDAOWithInvalidWitness {
 
     fn run(&self, net: Net) {
         let node0 = &net.nodes[0];
-        node0.generate_blocks(2);
+        node0.mine_blocks(2);
 
         let deposited = {
             let transaction = deposit_dao_transaction(node0);
@@ -204,7 +204,7 @@ impl Spec for WithdrawDAOWithInvalidWitness {
             ))
             .witnesses_clear()
             .build();
-            node0.generate_blocks(20);
+            node0.mine_blocks(20);
             assert_send_transaction_fail(
                 node0,
                 &transaction,
@@ -222,7 +222,7 @@ impl Spec for WithdrawDAOWithInvalidWitness {
             .witnesses_clear()
             .witness(vec![Bytes::from(vec![0, 0, 0, 0, 0, 0, 0, 0])])
             .build();
-            node0.generate_blocks(20);
+            node0.mine_blocks(20);
             assert_send_transaction_fail(
                 node0,
                 &transaction,
@@ -242,7 +242,7 @@ impl Spec for WithdrawDAOWithInvalidWitness {
             .witnesses_clear()
             .witness(witness)
             .build();
-            node0.generate_blocks(20);
+            node0.mine_blocks(20);
             assert_send_transaction_fail(
                 node0,
                 &transaction,
@@ -262,7 +262,7 @@ impl Spec for WithdrawDAOWithInvalidWitness {
             .witnesses_clear()
             .witness(witness)
             .build();
-            node0.generate_blocks(20);
+            node0.mine_blocks(20);
             assert_send_transaction_fail(
                 node0,
                 &transaction,
@@ -275,15 +275,14 @@ impl Spec for WithdrawDAOWithInvalidWitness {
 // Send the given transaction and ensure it being committed
 fn ensure_committed(node: &Node, transaction: &Transaction) -> (OutPoint, H256) {
     // Ensure the transaction's cellbase-maturity and since-maturity
-    node.generate_blocks(20);
+    node.mine_blocks(20);
 
     let tx_hash = node.send_transaction(transaction);
 
     // Ensure the sent transaction is beyond the proposal-window
-    node.generate_blocks(20);
+    node.mine_blocks(20);
 
     let tx_status = node
-        
         .get_transaction(tx_hash.clone())
         .expect("get sent transaction");
     assert!(
@@ -297,7 +296,7 @@ fn ensure_committed(node: &Node, transaction: &Transaction) -> (OutPoint, H256) 
 }
 
 fn tip_cellbase_input(node: &Node) -> (CellInput, H256, Capacity) {
-    let tip_block = node.get_tip_block();
+    let tip_block = node.tip_block();
     let cellbase = tip_block.transactions()[0].clone();
     let block_hash = tip_block.header().hash().to_owned();
     let tx_hash = cellbase.hash().to_owned();
@@ -378,7 +377,7 @@ fn withdraw_dao_witness() -> Vec<Bytes> {
 }
 
 fn absolute_minimal_since(node: &Node) -> BlockNumber {
-    node.get_tip_block_number() + WITHDRAW_WINDOW_LEFT
+    node.tip_number() + WITHDRAW_WINDOW_LEFT
 }
 
 // Construct a deposit dao transaction, which consumes the tip-cellbase as the input,
@@ -400,7 +399,7 @@ fn deposit_dao_transaction(node: &Node) -> Transaction {
 // Construct a withdraw dao transaction, which consumes the tip-cellbase and a given deposited cell
 // as the inputs, generates the output with always-success-script as lock script, none type script
 fn withdraw_dao_transaction(node: &Node, out_point: OutPoint, block_hash: H256) -> Transaction {
-    let tip_block = node.get_tip_block();
+    let tip_block = node.tip_block();
     let withdraw_out_point = OutPoint::new(tip_block.transactions()[0].hash().clone(), 0);
     let withdraw_header_hash: H256 = tip_block.header().hash().to_owned();
     let deposited_input = {
@@ -408,9 +407,8 @@ fn withdraw_dao_transaction(node: &Node, out_point: OutPoint, block_hash: H256) 
         CellInput::new(out_point.clone(), minimal_since)
     };
     let (output, output_data) = {
-        let input_capacities = node
-            
-            .calculate_dao_maximum_withdraw(out_point, withdraw_header_hash.clone());
+        let input_capacities =
+            node.calculate_dao_maximum_withdraw(out_point, withdraw_header_hash.clone());
         withdraw_dao_output(input_capacities)
     };
     let (cell_deps, mut header_deps) =

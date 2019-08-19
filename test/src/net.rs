@@ -150,7 +150,7 @@ impl Net {
 
     // generate a same block on all nodes, exit IBD mode and return the tip block
     pub fn exit_ibd_mode(&self) -> Block {
-        let block = self.nodes[0].new_block(None, None, None);
+        let block = self.nodes[0].build_block(None, None, None);
         self.nodes.iter().for_each(|node| {
             node.submit_block(&block);
         });

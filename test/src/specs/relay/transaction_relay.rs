@@ -1,4 +1,4 @@
-use crate::utils::wait_until;
+use crate::utils::{assert_tx_pool_size, wait_until};
 use crate::{Net, Spec};
 use ckb_core::transaction::{CellInput, OutPoint, TransactionBuilder};
 use ckb_core::Capacity;
@@ -19,8 +19,8 @@ impl Spec for TransactionRelayBasic {
         let node2 = &net.nodes[2];
 
         info!("Generate new transaction on node1");
-        node1.generate_block();
-        let hash = node1.generate_transaction();
+        node1.mine_block();
+        let hash = node1.send_transaction_with_tip_cellbase();
 
         info!("Waiting for relay");
         let rpc_client = node0;
@@ -62,7 +62,7 @@ impl Spec for TransactionRelayMultiple {
         let txs_num = reward.as_u64() / MIN_CAPACITY;
 
         let parent_hash = block.transactions()[0].hash().to_owned();
-        let temp_transaction = node0.new_transaction(parent_hash);
+        let temp_transaction = node0.build_transaction_with_hash(parent_hash);
         let mut output = temp_transaction.outputs()[0].clone();
         output.capacity = Capacity::shannons(reward.as_u64() / txs_num);
         let mut tb = TransactionBuilder::from_transaction(temp_transaction).outputs_clear();
@@ -71,9 +71,9 @@ impl Spec for TransactionRelayMultiple {
         }
         let transaction = tb.build();
         node0.send_transaction(&transaction);
-        node0.generate_block();
-        node0.generate_block();
-        node0.generate_block();
+        node0.mine_block();
+        node0.mine_block();
+        node0.mine_block();
         net.waiting_for_sync(4);
 
         info!("Send multiple transactions to node0");
@@ -91,19 +91,16 @@ impl Spec for TransactionRelayMultiple {
                 node0.send_transaction(&tx);
             });
 
-        node0.generate_block();
-        node0.generate_block();
-        node0.generate_block();
+        node0.mine_block();
+        node0.mine_block();
+        node0.mine_block();
         net.waiting_for_sync(7);
 
         info!("All transactions should be relayed and mined");
-        node0.assert_tx_pool_size(0, 0);
+        assert_tx_pool_size(node0, 0, 0);
 
-        net.nodes.iter().for_each(|node| {
-            assert_eq!(
-                node.get_tip_block().transactions().len() as u64,
-                txs_num + 1
-            )
-        });
+        net.nodes
+            .iter()
+            .for_each(|node| assert_eq!(node.tip_block().transactions().len() as u64, txs_num + 1));
     }
 }

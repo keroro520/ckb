@@ -1,4 +1,6 @@
-use crate::utils::{build_block, build_get_blocks, build_headers, wait_until};
+use crate::utils::{
+    build_block, build_get_blocks, build_headers, connect_and_wait_ban, wait_until,
+};
 use crate::{Net, Spec, TestProtocol};
 use ckb_core::block::Block;
 use ckb_core::transaction::TransactionBuilder;
@@ -32,46 +34,42 @@ impl Spec for ChainContainsInvalidBlock {
         let fresh_node = net.nodes.pop().unwrap();
 
         // Build invalid chain on bad_node
-        bad_node.generate_blocks(3);
+        bad_node.mine_blocks(3);
         let invalid_block = bad_node
-            .new_block_builder(None, None, None)
+            .build_block_builder(None, None, None)
             .transaction(TransactionBuilder::default().build())
             .build();
         let invalid_number = invalid_block.header().number();
         let invalid_hash = bad_node.process_block_without_verify(&invalid_block);
-        bad_node.generate_blocks(3);
+        bad_node.mine_blocks(3);
 
         // Start good_node and let it synchronize from bad_node
-        good_node.generate_block();
+        good_node.mine_block();
         fresh_node.connect(&good_node);
-        good_node.connect_and_wait_ban(&bad_node);
-        fresh_node.connect_and_wait_ban(&bad_node);
+        connect_and_wait_ban(&good_node, &bad_node);
+        connect_and_wait_ban(&fresh_node, &bad_node);
         assert!(
-            wait_until(5, || good_node.get_tip_block_number() >= invalid_number - 1),
+            wait_until(5, || good_node.tip_number() >= invalid_number - 1),
             "good_node should synchronize from bad_node 1~{}",
             invalid_number - 1,
         );
         assert!(
-            !wait_until(5, || good_node
-                
-                .get_block(invalid_hash.clone())
-                .is_some()),
+            !wait_until(5, || good_node.get_block(invalid_hash.clone()).is_some()),
             "good_node should not synchronize invalid block {} from bad_node",
             invalid_number,
         );
 
         // good_node mine the next block
-        good_node.generate_block();
-        let valid_hash = good_node.get_tip_block().header().hash().clone();
+        good_node.mine_block();
+        let valid_hash = good_node.tip_block().header().hash().clone();
         let valid_number = invalid_number + 1;
 
         assert!(
-            !wait_until(5, || fresh_node.get_tip_block_number() > valid_number),
+            !wait_until(5, || fresh_node.tip_number() > valid_number),
             "fresh_node should synchronize the valid blocks only",
         );
         assert!(
-            wait_until(5, || fresh_node.get_tip_block().header().hash()
-                == &valid_hash),
+            wait_until(5, || fresh_node.tip_block().header().hash() == &valid_hash),
             "fresh_node should synchronize the valid blocks only",
         );
     }
@@ -96,14 +94,14 @@ impl Spec for ForkContainsInvalidBlock {
         let bad_chain: Vec<Block> = {
             let tip_number = invalid_number * 2;
             let bad_node = net.nodes.pop().unwrap();
-            bad_node.generate_blocks(invalid_number - 1);
+            bad_node.mine_blocks(invalid_number - 1);
             let invalid_block = bad_node
-                .new_block_builder(None, None, None)
+                .build_block_builder(None, None, None)
                 .transaction(TransactionBuilder::default().build())
                 .build();
             bad_node.process_block_without_verify(&invalid_block);
-            bad_node.generate_blocks(tip_number - invalid_number);
-            (1..=bad_node.get_tip_block_number())
+            bad_node.mine_blocks(tip_number - invalid_number);
+            (1..=bad_node.tip_number())
                 .map(|i| bad_node.get_block_by_number(i))
                 .collect()
         };
@@ -115,7 +113,7 @@ impl Spec for ForkContainsInvalidBlock {
 
         // Sync headers of bad forks
         let good_node = net.nodes.pop().unwrap();
-        good_node.generate_block();
+        good_node.mine_block();
         net.connect(&good_node);
         let (pi, _, _) = net.receive();
         let headers: Vec<_> = bad_chain.iter().map(|b| b.header().clone()).collect();
@@ -123,8 +121,8 @@ impl Spec for ForkContainsInvalidBlock {
         assert!(wait_get_blocks(&net), "timeout to wait GetBlocks",);
 
         // Build good chain (good_chain.len < bad_chain.len)
-        good_node.generate_blocks(invalid_number + 2);
-        let tip_block = good_node.get_tip_block();
+        good_node.mine_blocks(invalid_number + 2);
+        let tip_block = good_node.tip_block();
 
         // Sync first part of bad fork which contains an invalid block
         // Good_node cannot detect the invalid block since "block delay verification".
@@ -137,13 +135,10 @@ impl Spec for ForkContainsInvalidBlock {
             .map(|b| b.header().hash().to_owned())
             .unwrap();
         assert!(
-            wait_until(10, || good_node
-                
-                .get_block(last_hash.clone())
-                .is_some()),
+            wait_until(10, || good_node.get_block(last_hash.clone()).is_some()),
             "good_node should store the fork blocks even it contains invalid blocks",
         );
-        assert_eq!(good_node.get_tip_block(), tip_block);
+        assert_eq!(good_node.tip_block(), tip_block);
 
         // Sync second part of bad fork.
         // Good_node detect the invalid block when fork.total_difficulty > tip.difficulty
@@ -155,13 +150,10 @@ impl Spec for ForkContainsInvalidBlock {
             .map(|b| b.header().hash().to_owned())
             .unwrap();
         assert!(
-            !wait_until(10, || good_node
-                
-                .get_block(last_hash.clone())
-                .is_some()),
+            !wait_until(10, || good_node.get_block(last_hash.clone()).is_some()),
             "good_node should keep the good chain",
         );
-        assert_eq!(good_node.get_tip_block(), tip_block);
+        assert_eq!(good_node.tip_block(), tip_block);
 
         // Additional testing: request an invalid fork via `GetBlock` should be failed
         net.send(
