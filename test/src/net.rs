@@ -108,7 +108,7 @@ impl Net {
                     NetworkService::new(
                         Arc::clone(&network_state),
                         protocols,
-                        node.consensus.as_ref().unwrap().identify_name(),
+                        node.consensus().identify_name(),
                         "0.1.0".to_string(),
                     )
                     .start(Default::default(), Some("NetworkService"))

@@ -24,10 +24,8 @@ pub struct Node {
     rpc_port: u16,
     rpc_client: RpcClient,
     node_id: Option<String>,
-    genesis_cellbase_hash: H256,
-    always_success_code_hash: H256,
+    consensus: Consensus,
     guard: Option<ProcessGuard>,
-    pub consensus: Option<Consensus>,
 }
 
 struct ProcessGuard(pub Child);
@@ -53,9 +51,7 @@ impl Node {
             rpc_client,
             node_id: None,
             guard: None,
-            genesis_cellbase_hash: Default::default(),
-            always_success_code_hash: Default::default(),
-            consensus: None,
+            consensus: Default::default(),
         }
     }
 
@@ -65,6 +61,22 @@ impl Node {
 
     pub fn p2p_port(&self) -> u16 {
         self.p2p_port
+    }
+
+    pub fn consensus(&self) -> &Consensus {
+        &self.consensus
+    }
+
+    pub fn genesis_cellbase_hash(&self) -> H256 {
+        self.consensus().genesis_block().transactions()[0]
+            .hash()
+            .to_owned()
+    }
+
+    pub fn always_success_code_hash(&self) -> H256 {
+        self.consensus().genesis_block().transactions()[0].outputs()[1]
+            .data_hash()
+            .to_owned()
     }
 
     pub fn start(
@@ -301,10 +313,10 @@ impl Node {
     }
 
     pub fn new_transaction_with_since(&self, hash: H256, since: u64) -> Transaction {
-        let always_success_out_point = OutPoint::new(self.genesis_cellbase_hash.clone(), 1);
+        let always_success_out_point = OutPoint::new(self.genesis_cellbase_hash(), 1);
         let always_success_script = Script::new(
             vec![],
-            self.always_success_code_hash.clone(),
+            self.always_success_code_hash(),
             ScriptHashType::Data,
         );
 
@@ -339,14 +351,7 @@ impl Node {
         }
         modify_chain_spec(&mut spec);
 
-        let consensus = spec.build_consensus().expect("build consensus");
-        self.genesis_cellbase_hash
-            .clone_from(consensus.genesis_block().transactions()[0].hash());
-        self.always_success_code_hash = consensus.genesis_block().transactions()[0].outputs()[1]
-            .data_hash()
-            .to_owned();
-
-        self.consensus = Some(consensus);
+        self.consensus = spec.build_consensus().expect("build consensus");
 
         // write to dir
         fs::write(
@@ -364,7 +369,7 @@ impl Node {
         let mut ckb_config: CKBAppConfig =
             toml::from_slice(&fs::read(&ckb_config_path)?).expect("ckb config");
         ckb_config.block_assembler = Some(BlockAssemblerConfig {
-            code_hash: self.always_success_code_hash.clone(),
+            code_hash: self.always_success_code_hash(),
             args: Default::default(),
             data: JsonBytes::default(),
             hash_type: ScriptHashType::Data,
