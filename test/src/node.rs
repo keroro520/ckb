@@ -1,5 +1,5 @@
 use crate::rpc::RpcClient;
-use crate::utils::wait_until;
+use crate::utils::{temp_path, wait_until};
 use ckb_app_config::{BlockAssemblerConfig, CKBAppConfig};
 use ckb_chain_spec::consensus::Consensus;
 use ckb_chain_spec::ChainSpec;
@@ -20,7 +20,7 @@ use std::process::{self, Child, Command, Stdio};
 
 pub struct Node {
     binary: String,
-    dir: String,
+    working_dir: String,
     p2p_port: u16,
     rpc_port: u16,
     rpc_client: RpcClient,
@@ -49,11 +49,11 @@ impl Deref for Node {
 }
 
 impl Node {
-    pub fn new(binary: &str, dir: &str, p2p_port: u16, rpc_port: u16) -> Self {
+    pub fn new(binary: &str, p2p_port: u16, rpc_port: u16) -> Self {
         let rpc_client = RpcClient::new(&format!("http://127.0.0.1:{}/", rpc_port));
         Self {
-            binary: binary.to_string(),
-            dir: dir.to_string(),
+            binary: binary.to_owned(),
+            working_dir: temp_path(),
             p2p_port,
             rpc_port,
             rpc_client,
@@ -61,6 +61,10 @@ impl Node {
             consensus: Default::default(),
             guard: None,
         }
+    }
+
+    pub fn working_dir(&self) -> &str {
+        &self.working_dir
     }
 
     pub fn node_id(&self) -> &String {
@@ -109,14 +113,13 @@ impl Node {
 
         let child_process = Command::new(self.binary.to_owned())
             .env("RUST_BACKTRACE", "full")
-            .args(&["-C", &self.dir, "run", "--ba-advanced"])
+            .args(&["-C", self.working_dir(), "run", "--ba-advanced"])
             .stdin(Stdio::null())
-            .stdout(Stdio::inherit())
+            .stdout(Stdio::null())
             .stderr(Stdio::inherit())
             .spawn()
             .expect("failed to run binary");
         self.guard = Some(ProcessGuard(child_process));
-        log::info!("Started node with working dir: {}", self.dir);
 
         loop {
             let result = { self.rpc_client().inner().local_node_info().call() };
@@ -303,15 +306,15 @@ impl Node {
     ) -> Result<(), Error> {
         let integration_spec = include_bytes!("../integration.toml");
         let always_success_cell = include_bytes!("../../script/testdata/always_success");
-        let always_success_path = Path::new(&self.dir).join("specs/cells/always_success");
-        fs::create_dir_all(format!("{}/specs", self.dir))?;
-        fs::create_dir_all(format!("{}/specs/cells", self.dir))?;
+        let always_success_path = Path::new(self.working_dir()).join("specs/cells/always_success");
+        fs::create_dir_all(format!("{}/specs", self.working_dir()))?;
+        fs::create_dir_all(format!("{}/specs/cells", self.working_dir()))?;
         fs::write(&always_success_path, &always_success_cell[..])?;
 
         let mut spec: ChainSpec =
             toml::from_slice(&integration_spec[..]).expect("chain spec config");
         for r in spec.genesis.system_cells.files.iter_mut() {
-            r.absolutize(Path::new(&self.dir).join("specs"));
+            r.absolutize(Path::new(self.working_dir()).join("specs"));
         }
         modify_chain_spec(&mut spec);
 
@@ -319,7 +322,7 @@ impl Node {
 
         // write to dir
         fs::write(
-            Path::new(&self.dir).join("specs/integration.toml"),
+            Path::new(self.working_dir()).join("specs/integration.toml"),
             toml::to_string(&spec).expect("chain spec serialize"),
         )
     }
@@ -329,7 +332,7 @@ impl Node {
         modify_ckb_config: Box<dyn Fn(&mut CKBAppConfig) -> ()>,
     ) -> Result<(), Error> {
         // rewrite ckb.toml
-        let ckb_config_path = format!("{}/ckb.toml", self.dir);
+        let ckb_config_path = format!("{}/ckb.toml", self.working_dir());
         let mut ckb_config: CKBAppConfig =
             toml::from_slice(&fs::read(&ckb_config_path)?).expect("ckb config");
         ckb_config.block_assembler = Some(BlockAssemblerConfig {
@@ -362,7 +365,7 @@ impl Node {
         Command::new(self.binary.to_owned())
             .args(&[
                 "-C",
-                &self.dir,
+                self.working_dir(),
                 "init",
                 "--chain",
                 "integration",

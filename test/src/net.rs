@@ -1,48 +1,30 @@
-use crate::utils::wait_until;
+use crate::utils::temp_path;
 use crate::{Node, Setup};
 use bytes::Bytes;
-use ckb_core::{block::Block, BlockNumber};
 use ckb_network::{
     CKBProtocol, CKBProtocolContext, CKBProtocolHandler, NetworkConfig, NetworkController,
     NetworkService, NetworkState, PeerIndex, ProtocolId,
 };
 use crossbeam_channel::{self, Receiver, RecvTimeoutError, Sender};
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Duration;
-use tempfile::tempdir;
 
 pub type NetMessage = (PeerIndex, ProtocolId, Bytes);
 
 pub struct Net {
-    pub nodes: Vec<Node>,
-    controller: Option<(NetworkController, Receiver<NetMessage>)>,
     setup: Setup,
     start_port: u16,
+    working_dir: String,
+    controller: Option<(NetworkController, Receiver<NetMessage>)>,
 }
 
 impl Net {
-    pub fn new(binary: &str, setup: Setup, start_port: u16) -> Self {
-        let nodes: Vec<Node> = (0..setup.num_nodes)
-            .map(|n| {
-                Node::new(
-                    binary,
-                    tempdir()
-                        .expect("create tempdir failed")
-                        .path()
-                        .to_str()
-                        .unwrap(),
-                    start_port + (n * 2 + 1) as u16,
-                    start_port + (n * 2 + 2) as u16,
-                )
-            })
-            .collect();
-
+    pub fn new(setup: Setup, start_port: u16) -> Self {
         Self {
-            nodes,
-            controller: None,
             start_port,
             setup,
+            working_dir: temp_path(),
+            controller: None,
         }
     }
 
@@ -50,11 +32,15 @@ impl Net {
         self.controller.as_ref().unwrap()
     }
 
+    pub fn working_dir(&self) -> &str {
+        &self.working_dir
+    }
+
     fn init_controller(&self, node: &Node) {
         assert!(
             !self.setup.protocols.is_empty(),
-            "It should not involve Net::init_controller when setup test_protocols is empty.\
-             Please specify non-empty test_protocols"
+            "It should not involve Net::init_controller when setup::test_protocols is empty.\
+             Please specify non-empty setup::test_protocols first"
         );
 
         let (tx, rx) = crossbeam_channel::unbounded();
@@ -69,10 +55,7 @@ impl Net {
             whitelist_only: false,
             max_peers: self.setup.num_nodes as u32,
             max_outbound_peers: self.setup.num_nodes as u32,
-            path: tempdir()
-                .expect("create tempdir failed")
-                .path()
-                .to_path_buf(),
+            path: self.working_dir().into(),
             ping_interval_secs: 15,
             ping_timeout_secs: 20,
             connect_outbound_interval_secs: 0,
@@ -131,51 +114,10 @@ impl Net {
             format!("/ip4/127.0.0.1/tcp/{}", node.p2p_port())
                 .parse()
                 .expect("invalid address"),
-        );
+        )
     }
 
-    pub fn connect_all(&self) {
-        self.nodes
-            .windows(2)
-            .for_each(|nodes| nodes[0].connect(&nodes[1]));
-    }
-
-    pub fn disconnect_all(&self) {
-        self.nodes.iter().for_each(|node_a| {
-            self.nodes.iter().for_each(|node_b| {
-                if node_a.node_id() != node_b.node_id() {
-                    node_a.disconnect(node_b)
-                }
-            })
-        });
-    }
-
-    // generate a same block on all nodes, exit IBD mode and return the tip block
-    pub fn exit_ibd_mode(&self) -> Block {
-        let block = self.nodes[0].build_block(None, None, None);
-        self.nodes.iter().for_each(|node| {
-            node.submit_block(&block);
-        });
-        block
-    }
-
-    pub fn waiting_for_sync(&self, target: BlockNumber) {
-        let rpc_clients: Vec<_> = self.nodes.iter().map(Node::rpc_client).collect();
-        let mut tip_numbers: HashSet<BlockNumber> = HashSet::with_capacity(self.nodes.len());
-        // 60 seconds is a reasonable timeout to sync, even for poor CI server
-        let result = wait_until(60, || {
-            tip_numbers = rpc_clients
-                .iter()
-                .map(|rpc_client| rpc_client.get_tip_block_number())
-                .collect();
-            tip_numbers.len() == 1 && tip_numbers.iter().next().cloned().unwrap() == target
-        });
-
-        if !result {
-            panic!("timeout to wait for sync, tip_numbers: {:?}", tip_numbers);
-        }
-    }
-
+    /// Blocks the current thread until a message is sent or panic if disconnected
     pub fn send(&self, protocol_id: ProtocolId, peer: PeerIndex, data: Bytes) {
         self.controller()
             .0
@@ -183,11 +125,16 @@ impl Net {
             .expect("Send message to p2p network failed");
     }
 
-    pub fn receive(&self) -> NetMessage {
-        self.controller().1.recv().unwrap()
+    /// Blocks the current thread until a message is received or panic if disconnected.
+    pub fn recv(&self) -> NetMessage {
+        self.controller()
+            .1
+            .recv()
+            .expect("Receive message from p2p network failed")
     }
 
-    pub fn receive_timeout(&self, timeout: Duration) -> Result<NetMessage, RecvTimeoutError> {
+    /// Waits for a message to be received from the channel, but only for a limited time.
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<NetMessage, RecvTimeoutError> {
         self.controller().1.recv_timeout(timeout)
     }
 }
