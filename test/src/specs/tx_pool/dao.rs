@@ -1,7 +1,9 @@
 use crate::utils::{assert_send_transaction_fail, is_committed};
 use crate::{Net, Node, Spec};
+use ckb_dao_utils::extract_dao_data;
 use ckb_resource::CODE_HASH_DAO;
 use ckb_test_chain_utils::always_success_cell;
+use ckb_types::core::{BlockView, HeaderView};
 use ckb_types::{
     bytes::Bytes,
     core::{BlockNumber, Capacity, ScriptHashType, TransactionBuilder, TransactionView},
@@ -9,6 +11,7 @@ use ckb_types::{
     prelude::*,
     H256,
 };
+use std::collections::HashMap;
 
 const SYSTEM_CELL_ALWAYS_SUCCESS_INDEX: u32 = 1;
 const SYSTEM_CELL_DAO_INDEX: u32 = 3;
@@ -264,6 +267,68 @@ impl Spec for WithdrawDAOWithInvalidWitness {
                 "InvalidTx(ScriptFailure(ValidationFailure(1)))",
             );
         }
+    }
+}
+
+pub struct GenesisOccupiedCapacities;
+
+impl Spec for GenesisOccupiedCapacities {
+    crate::name!("genesis_occupied_capacities");
+
+    fn run(&self, net: Net) {
+        let node0 = &net.nodes[0];
+
+        let (_remote_ar, remote_c, remote_u) = {
+            let tip_header: HeaderView = node0.rpc_client().get_tip_header().into();
+            extract_dao_data(tip_header.dao()).unwrap()
+        };
+
+        let (_local_ar, local_c, local_u) = {
+            let (ar, mut c, mut u) = (1, Capacity::zero(), Capacity::zero());
+            let block: BlockView = node0.get_block_by_number(0);
+            let all_transactions: HashMap<H256, TransactionView> = block
+                .transactions()
+                .into_iter()
+                .map(|transaction| (transaction.hash().unpack(), transaction))
+                .collect();
+
+            for (tx_index, transaction) in block.transactions().into_iter().enumerate() {
+                if tx_index != 0 {
+                    for input in transaction.inputs() {
+                        let out_point = input.previous_output();
+                        let input_transaction = all_transactions
+                            .get(&out_point.tx_hash().unpack())
+                            .expect("get input transaction");
+                        let input_cell_output = input_transaction
+                            .output(out_point.index().unpack())
+                            .expect("get input cell");
+                        let input_capacity: Capacity = input_cell_output.capacity().unpack();
+                        u = u.safe_sub(input_capacity).expect("sub input capacity");
+                    }
+                }
+                u = u
+                    .safe_add(
+                        transaction
+                            .outputs_capacity()
+                            .expect("transaction.outputs_capacity"),
+                    )
+                    .expect("sum occupied capacities");
+                c = c
+                    .safe_add(
+                        transaction
+                            .outputs_capacity()
+                            .expect("transaction.outputs_capacity"),
+                    )
+                    .expect("sum issued capacities");
+            }
+
+            (ar, c, u)
+        };
+        assert_eq!(
+            (remote_c, remote_u),
+            (local_c, local_u),
+            "unmatched genesis dao",
+        );
     }
 }
 

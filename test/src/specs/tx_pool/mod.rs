@@ -10,8 +10,9 @@ mod valid_since;
 
 pub use cellbase_maturity::CellbaseMaturity;
 pub use dao::{
-    DepositDAO, WithdrawAndDepositDAOWithinSameTx, WithdrawDAO, WithdrawDAOWithInvalidWitness,
-    WithdrawDAOWithNotMaturitySince, WithdrawDAOWithOverflowCapacity,
+    DepositDAO, GenesisOccupiedCapacities, WithdrawAndDepositDAOWithinSameTx, WithdrawDAO,
+    WithdrawDAOWithInvalidWitness, WithdrawDAOWithNotMaturitySince,
+    WithdrawDAOWithOverflowCapacity,
 };
 pub use depend_tx_in_same_block::DepentTxInSameBlock;
 pub use different_txs_with_same_input::DifferentTxsWithSameInput;
