@@ -186,8 +186,10 @@ impl ChainSpec {
 impl Genesis {
     fn build_block(&self) -> Result<BlockView, Box<dyn Error>> {
         let cellbase_transaction = self.build_cellbase_transaction()?;
-        let dao = genesis_dao_data(&cellbase_transaction)?;
-        let dep_group_transaction = self.build_dep_group_transaction(&cellbase_transaction)?;
+        // build transaction other than cellbase should return inputs for dao statistics
+        let (dep_group_transaction, inputs) =
+            self.build_dep_group_transaction(&cellbase_transaction)?;
+        let dao = genesis_dao_data(vec![&cellbase_transaction, &dep_group_transaction], inputs)?;
 
         let block = BlockBuilder::default()
             .version(self.version.pack())
@@ -272,7 +274,7 @@ impl Genesis {
     fn build_dep_group_transaction(
         &self,
         cellbase_tx: &TransactionView,
-    ) -> Result<TransactionView, Box<dyn Error>> {
+    ) -> Result<(TransactionView, Vec<Capacity>), Box<dyn Error>> {
         fn find_out_point_by_data_hash(
             tx: &TransactionView,
             data_hash: &H256,
@@ -315,10 +317,12 @@ impl Genesis {
 
         let privkey = Privkey::from(SPECIAL_CELL_PRIVKEY.clone());
         let lock_arg = secp_lock_arg(&privkey);
-        let input_out_point = cellbase_tx
+        let (input_out_point, input_occupied_capacity) = cellbase_tx
             .outputs()
             .into_iter()
-            .position(|output| {
+            .zip(cellbase_tx.outputs_data().into_iter())
+            .enumerate()
+            .find(|(_, (output, _))| {
                 output
                     .lock()
                     .args()
@@ -327,7 +331,16 @@ impl Genesis {
                     .as_ref()
                     == Some(&lock_arg)
             })
-            .map(|index| packed::OutPoint::new(cellbase_tx.hash().clone().unpack(), index as u32))
+            .map(|(index, (output, data))| {
+                (
+                    packed::OutPoint::new(cellbase_tx.hash().clone().unpack(), index as u32),
+                    output
+                        .occupied_capacity(
+                            Capacity::bytes(data.raw_data().len()).expect("Input capacity bytes"),
+                        )
+                        .expect("Input occupied_capacity"),
+                )
+            })
             .expect("Get special issued input failed");
         let input = packed::CellInput::new(input_out_point, 0);
 
@@ -357,13 +370,15 @@ impl Genesis {
         let sig = privkey.sign_recoverable(&message).expect("sign");
         let witness = vec![Bytes::from(sig.serialize()).pack()].pack();
 
-        Ok(TransactionBuilder::default()
+        let tx = TransactionBuilder::default()
             .cell_deps(cell_deps)
             .input(input)
             .outputs(outputs)
             .outputs_data(outputs_data)
             .witness(witness)
-            .build())
+            .build();
+        let inputs = vec![input_occupied_capacity];
+        Ok((tx, inputs))
     }
 }
 

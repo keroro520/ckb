@@ -125,7 +125,7 @@ impl Default for Consensus {
             .input(input)
             .witness(witness)
             .build();
-        let dao = genesis_dao_data(&cellbase).unwrap();
+        let dao = genesis_dao_data(vec![&cellbase], Vec::new()).unwrap();
         let genesis_block = BlockBuilder::default()
             .difficulty(U256::one().pack())
             .dao(dao)

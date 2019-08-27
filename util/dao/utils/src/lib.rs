@@ -25,36 +25,57 @@ pub enum Error {
     Format,
 }
 
-pub fn genesis_dao_data(genesis_cellbase_tx: &TransactionView) -> Result<Byte32, FailureError> {
-    let c = genesis_cellbase_tx
-        .data()
-        .raw()
-        .outputs()
+pub fn genesis_dao_data(
+    txs: Vec<&TransactionView>,
+    // All input occupied capacities in txs
+    inputs: Vec<Capacity>,
+) -> Result<Byte32, FailureError> {
+    let statistics_outputs = |tx: &TransactionView| -> Result<_, FailureError> {
+        let c = tx.data().raw().outputs().into_iter().try_fold(
+            Capacity::zero(),
+            |capacity, output| {
+                let cap: Capacity = output.capacity().unpack();
+                capacity.safe_add(cap)
+            },
+        )?;
+        let u = tx
+            .data()
+            .raw()
+            .outputs()
+            .into_iter()
+            .zip(
+                tx.data()
+                    .raw()
+                    .outputs_data()
+                    .into_iter()
+                    .map(|d| d.raw_data()),
+            )
+            .try_fold(Capacity::zero(), |capacity, (output, data)| {
+                Capacity::bytes(data.len()).and_then(|data_capacity| {
+                    output
+                        .occupied_capacity(data_capacity)
+                        .and_then(|c| capacity.safe_add(c))
+                })
+            })?;
+        Ok((c, u))
+    };
+
+    let result: Result<_, FailureError> =
+        txs.into_iter()
+            .try_fold((Capacity::zero(), Capacity::zero()), |(c, u), tx| {
+                let (tx_c, tx_u) = statistics_outputs(tx)?;
+                let c = c.safe_add(tx_c)?;
+                let u = u.safe_add(tx_u)?;
+                Ok((c, u))
+            });
+    let (c, u) = result?;
+
+    let freed_occupied_capacities = inputs
         .into_iter()
-        .try_fold(Capacity::zero(), |capacity, output| {
-            let cap: Capacity = output.capacity().unpack();
-            capacity.safe_add(cap)
+        .try_fold(Capacity::zero(), |capacities, occupied_capacity| {
+            capacities.safe_add(occupied_capacity)
         })?;
-    let u = genesis_cellbase_tx
-        .data()
-        .raw()
-        .outputs()
-        .into_iter()
-        .zip(
-            genesis_cellbase_tx
-                .data()
-                .raw()
-                .outputs_data()
-                .into_iter()
-                .map(|d| d.raw_data()),
-        )
-        .try_fold(Capacity::zero(), |capacity, (output, data)| {
-            Capacity::bytes(data.len()).and_then(|data_capacity| {
-                output
-                    .occupied_capacity(data_capacity)
-                    .and_then(|c| capacity.safe_add(c))
-            })
-        })?;
+    let u = u.safe_sub(freed_occupied_capacities)?;
     Ok(pack_dao_data(DEFAULT_ACCUMULATED_RATE, c, u))
 }
 
