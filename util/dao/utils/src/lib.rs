@@ -4,12 +4,12 @@ extern crate enum_display_derive;
 mod error;
 
 use byteorder::{ByteOrder, LittleEndian};
+use ckb_error::Error;
 use ckb_types::{
     core::{Capacity, TransactionView},
     packed::Byte32,
     prelude::*,
 };
-use ckb_error::Error;
 
 pub use crate::error::DaoError;
 
@@ -20,7 +20,7 @@ pub const DAO_VERSION: u8 = 1;
 
 pub const DAO_SIZE: usize = 32;
 
-pub fn genesis_dao_data(genesis_cellbase_tx: &Transaction) -> Result<Bytes, Error> {
+pub fn genesis_dao_data(genesis_cellbase_tx: &TransactionView) -> Result<Byte32, Error> {
     let c = genesis_cellbase_tx
         .data()
         .raw()

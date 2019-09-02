@@ -16,8 +16,6 @@ use ckb_hash::{blake2b_256, new_blake2b};
 use ckb_jsonrpc_types::Script;
 use ckb_pow::{Pow, PowEngine};
 use ckb_resource::{Resource, CODE_HASH_SECP256K1_BLAKE160_SIGHASH_ALL, CODE_HASH_SECP256K1_DATA};
-pub use error::SpecError;
-use failure::Fail;
 use ckb_types::{
     bytes::Bytes,
     constants::TYPE_ID_CODE_HASH,
@@ -29,6 +27,8 @@ use ckb_types::{
     prelude::*,
     H256, U256,
 };
+pub use error::SpecError;
+use failure::Fail;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::error::Error;

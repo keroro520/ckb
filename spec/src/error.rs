@@ -1,6 +1,6 @@
 use ckb_error::{Error, ErrorKind};
+use ckb_types::packed::Byte32;
 use failure::{format_err, Error as FailureError, Fail};
-use numext_fixed_hash::H256;
 use std::convert::TryFrom;
 
 #[derive(Fail, Debug, Clone, Eq, PartialEq)]
@@ -18,7 +18,7 @@ pub enum SpecError {
         display = "UnmatchedGenesis{{expected: {:#x}, actual: {:#x}}}",
         expected, actual
     )]
-    UnmatchedGenesis { expected: H256, actual: H256 },
+    UnmatchedGenesis { expected: Byte32, actual: Byte32 },
 }
 
 impl<'a> TryFrom<&'a Error> for &'a SpecError {

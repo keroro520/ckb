@@ -1,4 +1,4 @@
-use crate::transaction::OutPoint;
+use crate::generated::packed::{Byte32, OutPoint};
 use ckb_error::{Error, ErrorKind};
 use failure::{format_err, Error as FailureError, Fail};
 use std::convert::TryFrom;
@@ -38,6 +38,16 @@ pub enum OutPointError {
     // NOTE: Maybe replace with `UnknownInputCell`?
     #[fail(display = "OutOfOrder({:?})", _0)]
     OutOfOrder(OutPoint),
+
+    /// The output is referenced as a dep-group output, but the data
+    /// is invalid format
+    #[fail(display = "InvalidDepGroup({:?})", _0)]
+    InvalidDepGroup(OutPoint),
+
+    /// Invalid HeaderDep
+    #[fail(display = "InvalidHeaderDep({:?})", _0)]
+    // TODO: This error should be move into HeaderError or TransactionError
+    InvalidHeaderDep(Byte32),
 }
 
 impl From<OutPointError> for Error {
