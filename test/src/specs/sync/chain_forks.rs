@@ -294,7 +294,7 @@ impl Spec for ChainFork5 {
                     .build()
             }
         };
-        node1.submit_block(&block.data());
+        node1.submit_block(&block);
         assert_eq!(15, node1.rpc_client().get_tip_block_number());
         info!("Generate 1 blocks (F) with spent transaction on node1");
         let block = node1.new_block(None, None, None);
@@ -588,8 +588,8 @@ impl Spec for ForksContainSameUncle {
         node_b.generate_block();
 
         info!("(2) Add `uncle` into different forks in node_a and node_b");
-        node_a.submit_block(&uncle.data());
-        node_b.submit_block(&uncle.data());
+        node_a.submit_block(&uncle);
+        node_b.submit_block(&uncle);
         let block_a = node_a
             .new_block_builder(None, None, None)
             .set_uncles(vec![uncle.as_uncle()])
@@ -599,8 +599,8 @@ impl Spec for ForksContainSameUncle {
             .set_uncles(vec![uncle.as_uncle()])
             .timestamp((block_a.timestamp() + 2).pack())
             .build();
-        node_a.submit_block(&block_a.data());
-        node_b.submit_block(&block_b.data());
+        node_a.submit_block(&block_a);
+        node_b.submit_block(&block_b);
 
         info!("(3) Make node_b's fork longer(to help check whether is synchronized)");
         node_b.generate_block();
