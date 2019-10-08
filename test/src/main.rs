@@ -279,6 +279,12 @@ fn all_specs() -> SpecMap {
         Box::new(UncleInheritFromForkBlock),
         Box::new(UncleInheritFromForkUncle),
         Box::new(PackUnclesIntoEpochStarting),
+        Box::new(HandlingDescendantsOfProposed),
+        Box::new(HandlingDescendantsOfCommitted),
+        Box::new(ProposeOutOfOrder),
+        Box::new(SubmitTransactionWhenItsParentInGap),
+        Box::new(SubmitTransactionWhenItsParentInProposed),
+        Box::new(ProposeTransactionButParentNot),
     ];
     specs.into_iter().map(|spec| (spec.name(), spec)).collect()
 }
