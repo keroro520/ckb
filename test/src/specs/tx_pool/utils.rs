@@ -13,10 +13,13 @@ pub struct TxFamily {
 
 impl TxFamily {
     pub fn init(ancestor_transaction: TransactionView) -> Self {
-        const FAMILY_PEOPLES: usize = 5;
+        const DEFAULT_FAMILY_SIZE: usize = 5;
+        Self::initn(ancestor_transaction, DEFAULT_FAMILY_SIZE)
+    }
 
+    pub fn initn(ancestor_transaction: TransactionView, family_size: usize) -> Self {
         let mut transactions = vec![ancestor_transaction];
-        while transactions.len() < FAMILY_PEOPLES {
+        while transactions.len() < family_size {
             let parent = transactions.last().unwrap();
             let child = parent
                 .as_advanced_builder()
@@ -37,6 +40,10 @@ impl TxFamily {
         self.transactions
             .get(index)
             .expect("out of index of tx-family")
+    }
+
+    pub fn len(&self) -> usize {
+        self.transactions.len()
     }
 
     #[allow(dead_code)]

@@ -1,4 +1,4 @@
-use crate::specs::tx_pool::utils::prepare_txfamily;
+use crate::specs::tx_pool::utils::{prepare_txfamily, TxFamily};
 use crate::{Net, Node, Spec};
 use ckb_types::core::{BlockView, TransactionView};
 use std::collections::HashSet;
@@ -226,6 +226,44 @@ impl Spec for ProposeTransactionButParentNot {
         node.rpc_client()
             .submit_block("".to_string(), block.data().into())
             .expect_err("should be failed as it contains invalid transaction");
+    }
+}
+
+pub struct ProposeBigFamily;
+
+impl Spec for ProposeBigFamily {
+    crate::name!("propose_big_family");
+
+    fn run(&self, net: &mut Net) {
+        let node = &net.nodes[0];
+        let window = node.consensus().tx_proposal_window();
+        node.generate_blocks((window.farthest() + 2) as usize);
+
+        let family_count = 1;
+        let family_size = 30;
+
+        let ancestors = (0..family_count).map(|_| {
+            // Ensure the generated transactions are conform to the cellbase mature rule
+            let ancestor = node.new_transaction_spend_tip_cellbase();
+            node.generate_blocks(node.consensus().cellbase_maturity().index() as usize);
+            ancestor
+        }).collect::<Vec<_>>();
+
+        let mut cnt = 0;
+        (0..family_count).for_each(|family_i| {
+            let ancestor = ancestors[family_i].clone();
+            let family = TxFamily::initn(ancestor, family_size as usize);
+            for i in 0..family.len() {
+                let tx = family.get(i);
+                node.submit_transaction(tx);
+                cnt += 1;
+                if cnt % 200 == 0 {
+                    println!("bilibili cnt: {}", cnt);
+                }
+            }
+        });
+
+        node.generate_blocks(window.length() as usize * 10);
     }
 }
 
