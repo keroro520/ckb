@@ -1,10 +1,14 @@
-use super::*;
+use crate::specs::dao::utils::{
+    deposit_transaction, ensure_committed, goto_target_point, withdraw_transaction,
+};
 use crate::utils::is_committed;
 use crate::{Net, Spec, DEFAULT_TX_PROPOSAL_WINDOW};
 use ckb_chain_spec::{ChainSpec, IssuedCell};
 use ckb_crypto::secp::{Generator, Privkey, Pubkey};
 use ckb_dao_utils::extract_dao_data;
 use ckb_test_chain_utils::always_success_cell;
+use ckb_types::core::{EpochNumberWithFraction, TransactionBuilder};
+use ckb_types::packed::{CellInput, CellOutput, OutPoint};
 use ckb_types::{
     bytes::Bytes,
     core::{Capacity, Ratio},
@@ -23,34 +27,38 @@ impl Spec for DAOWithSatoshiCellOccupied {
     crate::name!("dao_with_satoshi_cell_occupied");
 
     fn run(&self, net: &mut Net) {
-        let node0 = &net.nodes[0];
-        // try deposit then withdraw dao
-        node0.generate_blocks((DEFAULT_TX_PROPOSAL_WINDOW.1 + 2) as usize);
+        let node = &net.nodes[0];
+        node.generate_blocks((DEFAULT_TX_PROPOSAL_WINDOW.1 + 2) as usize);
+
         let deposited = {
-            let transaction = deposit_dao_transaction(node0);
-            ensure_committed(node0, &transaction)
+            let unspent = node
+                .new_transaction_spend_tip_cellbase()
+                .inputs()
+                .get(0)
+                .unwrap()
+                .previous_output();
+            let transaction = deposit_transaction(node, unspent);
+            ensure_committed(node, &transaction)
         };
-        let transaction = withdraw_dao_transaction(node0, deposited.0.clone(), deposited.1.clone());
-        node0.generate_blocks(20);
-        let tx_hash = node0
-            .rpc_client()
-            .send_transaction(transaction.data().into());
-        node0.generate_blocks(3);
-        let tx_status = node0
-            .rpc_client()
-            .get_transaction(tx_hash.clone())
-            .expect("get sent transaction");
-        assert!(
-            is_committed(&tx_status),
-            "ensure_committed failed {:#x}",
-            tx_hash
+
+        let withdrawal = {
+            let tip_hash = node.rpc_client().get_tip_header().hash.pack();
+            withdraw_transaction(node, deposited.clone(), tip_hash)
+        };
+        let since = EpochNumberWithFraction::from_full_value(
+            withdrawal.inputs().get(0).unwrap().since().unpack(),
         );
+        goto_target_point(node, since);
+        ensure_committed(node, &withdrawal);
     }
 
     fn modify_chain_spec(&self) -> Box<dyn Fn(&mut ChainSpec) -> ()> {
         Box::new(|spec_config| {
             let satoshi_cell = issue_satoshi_cell();
             spec_config.genesis.issued_cells.push(satoshi_cell);
+            spec_config.params.genesis_epoch_length = 2;
+            spec_config.params.epoch_duration_target = 2;
+            spec_config.params.permanent_difficulty_in_dummy = true;
         })
     }
 }
@@ -155,6 +163,9 @@ impl Spec for SpendSatoshiCell {
             spec_config.genesis.issued_cells.push(issue_satoshi_cell());
             spec_config.genesis.satoshi_gift.satoshi_cell_occupied_ratio =
                 satoshi_cell_occupied_ratio;
+            spec_config.params.genesis_epoch_length = 2;
+            spec_config.params.epoch_duration_target = 2;
+            spec_config.params.permanent_difficulty_in_dummy = true;
         })
     }
 }

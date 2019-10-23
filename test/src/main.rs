@@ -267,16 +267,11 @@ fn all_specs() -> SpecMap {
         Box::new(LongForks),
         Box::new(ForksContainSameTransactions),
         Box::new(ForksContainSameUncle),
-        Box::new(DepositDAO),
-        // pick from https://github.com/nervosnetwork/ckb/pull/1626
-        // TODO: add NervosDAO tests back when we have a way to build longer
-        // chains in tests.
-        // Box::new(WithdrawDAO),
-        // Box::new(WithdrawAndDepositDAOWithinSameTx),
-        Box::new(WithdrawDAOWithNotMaturitySince),
-        // Box::new(WithdrawDAOWithOverflowCapacity),
-        Box::new(WithdrawDAOWithInvalidWitness),
-        // Box::new(DAOWithSatoshiCellOccupied),
+        Box::new(WithdrawDAO),
+        // Box::new(WithdrawImmatureDAO),
+        Box::new(WithdrawAndDepositDAOWithinSameTx),
+        Box::new(WithdrawDAOWithOverflowCapacity),
+        Box::new(DAOWithSatoshiCellOccupied),
         Box::new(SpendSatoshiCell::new()),
         Box::new(MiningBasic),
         Box::new(BootstrapCellbase),
