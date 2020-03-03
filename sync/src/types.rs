@@ -813,7 +813,14 @@ impl SyncState {
 
     // Return true when the block is that we have requested and received first time.
     pub fn new_block_received(&self, block: &core::BlockView) -> bool {
-        self.write_inflight_blocks().remove_by_block(block.hash())
+        let ret = self.write_inflight_blocks().remove_by_block(block.hash());
+        if ret {
+            metric!({
+                "topic": "receive_unknown_block",
+                "tags": { "block_hash": format!("{}", block.hash()) }
+            });
+        }
+        ret
     }
 
     pub fn insert_inflight_proposals(&self, ids: Vec<packed::ProposalShortId>) -> Vec<bool> {
