@@ -320,6 +320,7 @@ impl InflightBlocks {
 
     pub fn prune(&mut self) {
         let now = unix_time_as_millis();
+        let prev_count = self.total_inflight_count();
         let blocks = &mut self.blocks;
         self.states.retain(|k, v| {
             let outdate = (v.timestamp + BLOCK_DOWNLOAD_TIMEOUT) < now;
@@ -330,6 +331,12 @@ impl InflightBlocks {
             }
             !outdate
         });
+        if prev_count != self.total_inflight_count() {
+            metric!({
+                "topic": "blocks_in_flight",
+                "fields": { "count": self.total_inflight_count(), "elapsed": BLOCK_DOWNLOAD_TIMEOUT }
+            });
+        }
     }
 
     pub fn insert(&mut self, peer: PeerIndex, hash: Byte32) -> bool {
@@ -369,6 +376,14 @@ impl InflightBlocks {
                 for peer in state.peers {
                     self.blocks.get_mut(&peer).map(|set| set.remove(&block));
                 }
+                state.timestamp
+            })
+            .map(|timestamp| {
+                let elapsed = unix_time_as_millis().saturating_sub(timestamp);
+                metric!({
+                    "topic": "blocks_in_flight",
+                    "fields": { "count": self.total_inflight_count(), "elapsed": elapsed }
+                });
             })
             .is_some()
     }
@@ -731,8 +746,7 @@ impl SyncState {
             "HeaderView must exists in header_map before set best header"
         );
         metric!({
-            "topic": "growth",
-            "tags": { "event": "header_chain", },
+            "topic": "header-chain",
             "fields": { "tip_number": header.number(), }
         });
         *self.shared_best_header.write() = header;
@@ -833,8 +847,8 @@ impl SyncState {
     }
 
     pub fn disconnected(&self, pi: PeerIndex) -> Option<PeerState> {
-        self.known_txs.lock().inner.remove(&pi);
-        self.inflight_blocks.write().remove_by_peer(pi);
+        self.known_txs().inner.remove(&pi);
+        self.write_inflight_blocks().remove_by_peer(pi);
         self.peers().disconnected(pi)
     }
 
