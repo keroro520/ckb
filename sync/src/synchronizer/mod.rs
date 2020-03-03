@@ -345,12 +345,21 @@ impl Synchronizer {
     }
 
     fn find_blocks_to_fetch(&self, nc: &dyn CKBProtocolContext) {
+        let is_ibd = { self.shared.snapshot().is_initial_block_download() };
         let peers: Vec<PeerIndex> = {
             self.peers()
                 .state
                 .read()
                 .iter()
-                .filter(|(_, state)| state.sync_started)
+                .filter(|(_, state)| {
+                    if is_ibd {
+                        state.peer_flags.is_outbound
+                            || state.peer_flags.is_whitelist
+                            || state.peer_flags.is_protect
+                    } else {
+                        state.sync_started
+                    }
+                })
                 .map(|(peer_id, _)| peer_id)
                 .cloned()
                 .collect()
@@ -507,8 +516,11 @@ impl CKBProtocolHandler for Synchronizer {
                 IBD_BLOCK_FETCH_TOKEN => {
                     if snapshot.is_initial_block_download() {
                         self.find_blocks_to_fetch(nc.as_ref());
-                    } else if nc.remove_notify(IBD_BLOCK_FETCH_TOKEN).is_err() {
-                        trace!("remove ibd block fetch fail");
+                    } else {
+                        self.shared.snapshot().state().peers().clear_unknown_list();
+                        if nc.remove_notify(IBD_BLOCK_FETCH_TOKEN).is_err() {
+                            trace!("remove ibd block fetch fail");
+                        }
                     }
                 }
                 NOT_IBD_BLOCK_FETCH_TOKEN => {

@@ -75,6 +75,7 @@ pub struct PeerFlags {
 
 #[derive(Clone, Default, Debug)]
 pub struct PeerState {
+    // only use on header sync
     pub sync_started: bool,
     pub headers_sync_timeout: Option<u64>,
     pub peer_flags: PeerFlags,
@@ -86,6 +87,9 @@ pub struct PeerState {
 
     pub best_known_header: Option<HeaderView>,
     pub last_common_header: Option<core::HeaderView>,
+    // use on ibd concurrent block download
+    // save `get_headers` locator hashes on here
+    pub unknown_header_list: Vec<Byte32>,
 }
 
 impl PeerState {
@@ -100,6 +104,7 @@ impl PeerState {
             tx_ask_for_set: HashSet::new(),
             best_known_header: None,
             last_common_header: None,
+            unknown_header_list: Vec::new(),
         }
     }
 
@@ -431,6 +436,33 @@ impl Peers {
 
     pub fn disconnected(&self, peer: PeerIndex) -> Option<PeerState> {
         self.state.write().remove(&peer)
+    }
+
+    pub fn insert_unknown_list(&self, peer: PeerIndex, hash: Byte32) {
+        self.state
+            .write()
+            .entry(peer)
+            .and_modify(|state| state.unknown_header_list.push(hash));
+    }
+
+    pub fn clear_unknown_list(&self) {
+        self.state.write().values_mut().for_each(|state| {
+            if !state.unknown_header_list.is_empty() {
+                state.unknown_header_list.clear()
+            }
+        })
+    }
+
+    pub fn get_unknown_list(&self, peer: PeerIndex) -> Option<Vec<Byte32>> {
+        self.state.write().get_mut(&peer).and_then(|state| {
+            let tmp = Vec::with_capacity(state.unknown_header_list.len());
+            let res = ::std::mem::replace(&mut state.unknown_header_list, tmp);
+            Some(res)
+        })
+    }
+
+    pub fn get_flag(&self, peer: PeerIndex) -> Option<PeerFlags> {
+        self.state.read().get(&peer).map(|state| state.peer_flags)
     }
 }
 
@@ -835,6 +867,16 @@ impl SyncState {
 
     pub fn get_orphan_block(&self, block_hash: &Byte32) -> Option<core::BlockView> {
         self.orphan_block_pool.get_block(block_hash)
+    }
+
+    pub fn insert_peer_unknown_header_list(&self, pi: PeerIndex, header_list: Vec<Byte32>) {
+        for hash in header_list {
+            if let Some(header) = self.header_map.read().get(&hash) {
+                self.peers.new_header_received(pi, header)
+            } else {
+                self.peers.insert_unknown_list(pi, hash)
+            }
+        }
     }
 }
 

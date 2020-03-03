@@ -34,6 +34,16 @@ impl BlockFetcher {
     }
 
     pub fn peer_best_known_header(&self) -> Option<HeaderView> {
+        // update best known header and clean up unknown list
+        let list = self
+            .synchronizer
+            .peers()
+            .get_unknown_list(self.peer)
+            .unwrap();
+        self.snapshot
+            .state()
+            .insert_peer_unknown_header_list(self.peer, list);
+
         self.synchronizer.peers().get_best_known_header(self.peer)
     }
 

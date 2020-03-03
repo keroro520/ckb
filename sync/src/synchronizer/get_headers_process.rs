@@ -32,16 +32,8 @@ impl<'a> GetHeadersProcess<'a> {
 
     pub fn execute(self) -> Status {
         let snapshot = self.synchronizer.shared.snapshot();
-        if snapshot.is_initial_block_download() {
-            info!(
-                "Ignoring getheaders from peer={} because node is in initial block download",
-                self.peer
-            );
-            self.send_in_ibd();
-            return Status::ignored();
-        }
 
-        let block_locator_hashes = self
+        let mut block_locator_hashes = self
             .message
             .block_locator_hashes()
             .iter()
@@ -54,6 +46,23 @@ impl<'a> GetHeadersProcess<'a> {
                 "Locator count({}) > MAX_LOCATOR_SIZE({})",
                 locator_size, MAX_LOCATOR_SIZE,
             ));
+        }
+
+        if snapshot.is_initial_block_download() {
+            info!(
+                "Ignoring getheaders from peer={} because node is in initial block download",
+                self.peer
+            );
+            self.send_in_ibd();
+            // remove genesis block hash
+            block_locator_hashes.pop();
+            let flag = snapshot.state().peers().get_flag(self.peer).unwrap();
+            if flag.is_outbound || flag.is_whitelist || flag.is_protect {
+                snapshot
+                    .state()
+                    .insert_peer_unknown_header_list(self.peer, block_locator_hashes);
+            }
+            return Status::ignored();
         }
 
         if let Some(block_number) =
