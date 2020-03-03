@@ -516,10 +516,15 @@ impl HeaderView {
         if number > current.number() {
             return None;
         }
+
+        let base_number = current.number();
+        let start_time = Instant::now();
+        let mut steps = 0u64;
         let mut number_walk = current.number();
         while number_walk > number {
             let number_skip = get_skip_height(number_walk);
             let number_skip_prev = get_skip_height(number_walk - 1);
+            steps += 1;
             match current.skip_hash {
                 Some(ref hash)
                     if number_skip == number
@@ -537,6 +542,11 @@ impl HeaderView {
                 }
             }
         }
+        metric!({
+            "topic": "get_ancestor",
+            "tags": { "base_number": base_number, "target_number": number, "ancestor_number": current.number() },
+            "fields": { "steps": steps, "elapsed": start_time.elapsed().as_millis() },
+        });
         Some(current).map(HeaderView::into_inner)
     }
 
