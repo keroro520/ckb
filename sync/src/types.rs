@@ -6,7 +6,7 @@ use crate::{NetworkProtocol, SUSPEND_SYNC_TIME};
 use crate::{MAX_HEADERS_LEN, MAX_TIP_AGE, RETRY_ASK_TX_TIMEOUT_INCREASE};
 use ckb_chain::chain::ChainController;
 use ckb_chain_spec::consensus::Consensus;
-use ckb_logger::{debug, debug_target, error};
+use ckb_logger::{debug, debug_target, error, metric};
 use ckb_network::{CKBProtocolContext, PeerIndex};
 use ckb_shared::{shared::Shared, Snapshot};
 use ckb_store::ChainStore;
@@ -730,6 +730,11 @@ impl SyncState {
             self.header_map.read().contains_key(&header.hash()),
             "HeaderView must exists in header_map before set best header"
         );
+        metric!({
+            "topic": "growth",
+            "tags": { "event": "header_chain", },
+            "fields": { "tip_number": header.number(), }
+        });
         *self.shared_best_header.write() = header;
     }
 
