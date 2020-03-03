@@ -498,19 +498,22 @@ impl HeaderView {
     where
         F: FnMut(&Byte32) -> Option<HeaderView>,
     {
+        error!("bilibili build_skip: self.number(): {}, get_skip_height: {}", self.number(), get_skip_height(self.number()));
         self.skip_hash = get_header_view(&self.parent_hash())
-            .and_then(|parent| parent.get_ancestor(get_skip_height(self.number()), get_header_view))
+            .and_then(|parent| parent.get_ancestor(get_skip_height(self.number()), get_header_view, |_, _| None))
             .map(|header| header.hash());
     }
 
     // NOTE: get_header_view may change source state, for cache or for tests
-    pub fn get_ancestor<F>(
+    pub fn get_ancestor<F, G>(
         self,
         number: BlockNumber,
         mut get_header_view: F,
+        fast_scanner: G,
     ) -> Option<core::HeaderView>
     where
         F: FnMut(&Byte32) -> Option<HeaderView>,
+        G: Fn(&Byte32, BlockNumber) -> Option<HeaderView>,
     {
         let mut current = self;
         if number > current.number() {
@@ -518,7 +521,7 @@ impl HeaderView {
         }
 
         let base_number = current.number();
-        let start_time = Instant::now();
+        let timestamp = unix_time_as_millis();
         let mut steps = 0u64;
         let mut number_walk = current.number();
         while number_walk > number {
@@ -527,16 +530,22 @@ impl HeaderView {
             steps += 1;
             match current.skip_hash {
                 Some(ref hash)
-                    if number_skip == number
-                        || (number_skip > number
-                            && !(number_skip_prev + 2 < number_skip
-                                && number_skip_prev >= number)) =>
+                    if number_skip == number || (number_skip > number && !(number_skip_prev + 2 < number_skip && number_skip_prev >= number)) =>
                 {
+                    if let Some(target) = fast_scanner(hash, number) {
+                        current = target;
+                        break;
+                    }
+
                     // Only follow skip if parent->skip isn't better than skip->parent
                     current = get_header_view(hash)?;
                     number_walk = number_skip;
                 }
                 _ => {
+                    if let Some(target) = fast_scanner(&current.parent_hash(), number) {
+                        current = target;
+                        break;
+                    }
                     current = get_header_view(&current.parent_hash())?;
                     number_walk -= 1;
                 }
@@ -545,7 +554,7 @@ impl HeaderView {
         metric!({
             "topic": "get_ancestor",
             "tags": { "base_number": base_number, "target_number": number, "ancestor_number": current.number() },
-            "fields": { "steps": steps, "elapsed": start_time.elapsed().as_millis() },
+            "fields": { "steps": steps, "elapsed": unix_time_as_millis().saturating_sub(timestamp) },
         });
         Some(current).map(HeaderView::into_inner)
     }
@@ -974,15 +983,20 @@ impl SyncSnapshot {
     }
 
     pub fn get_ancestor(&self, base: &Byte32, number: BlockNumber) -> Option<core::HeaderView> {
-        // shortcut to return a ancestor block
-        if self.store().is_main_chain(&base) {
-            return self
-                .store()
-                .get_block_hash(number)
-                .and_then(|hash| self.get_header_view(&hash).map(HeaderView::into_inner));
-        }
+        error!("bilibili sync_snapshot: number(): {}", number);
         self.get_header_view(base)?
-            .get_ancestor(number, |hash| self.get_header_view(hash))
+            .get_ancestor(number, |hash| self.get_header_view(hash),
+            |base, number| {
+                // shortcut to return a ancestor block
+                if self.store().is_main_chain(&base) {
+                    self
+                        .store()
+                        .get_block_hash(number)
+                        .and_then(|hash| self.get_header_view(&hash))
+                } else {
+                    None
+                }
+            })
     }
 
     pub fn get_locator(&self, start: &core::HeaderView) -> Vec<Byte32> {
@@ -1352,7 +1366,7 @@ mod tests {
                 .get_ancestor(b, |hash| {
                     count += 1;
                     header_map.get(hash).cloned()
-                })
+                }, |_, _| None)
                 .unwrap();
 
             // Search must finished in <limit> steps
