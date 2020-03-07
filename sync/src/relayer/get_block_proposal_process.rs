@@ -81,6 +81,7 @@ impl<'a> GetBlockProposalProcess<'a> {
         if let Err(err) = self.nc.send_message_to(self.peer, data) {
             StatusCode::Network.with_context(format!("Send GetBlockProposal error: {:?}", err,));
         }
+        crate::relayer::log_sent_metric(message.to_enum().item_name());
         Status::ok()
     }
 }

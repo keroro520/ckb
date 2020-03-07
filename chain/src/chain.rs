@@ -328,8 +328,12 @@ impl ChainService {
             if !fork.detached_blocks.is_empty() {
                 metric!({
                     "topic": "reorg",
-                    "tags": {},
                     "fields": { "attached": fork.attached_blocks.len(), "detached": fork.detached_blocks.len(), },
+                });
+            } else {
+                metric!({
+                    "topic": "chain",
+                    "fields": { "main_chain_tip": block.header().number(), }
                 });
             }
 
