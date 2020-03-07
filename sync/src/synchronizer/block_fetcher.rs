@@ -133,26 +133,42 @@ impl BlockFetcher {
                     break;
                 }
 
-                let to_fetch = self
-                    .snapshot
-                    .get_ancestor(&best_known_header.hash(), index_height)?;
+                // Try to get [from, to) headers, return the corresponding headers in reversed order.
+                let from = index_height;
+                let to = from + (count - fetch.len()) as u64;
+                let candidates = {
+                    let mut candidates = Vec::with_capacity((to - from) as usize);
+                    let mut parent_hash = self
+                        .snapshot
+                        .get_ancestor(&best_known_header.hash(), to)?
+                        .parent_hash();
+                    for _ in from..to {
+                        let header = self.snapshot.get_header_view(&parent_hash)?;
+                        parent_hash = header.parent_hash();
+                        candidates.push(header.into_inner());
+                    }
+                    candidates
+                };
+                index_height = to - 1;
 
-                // NOTE: Filtering `BLOCK_STORED` but not `BLOCK_RECEIVED`, is for avoiding
-                // stopping synchronization even when orphan_pool maintains dirty items by bugs.
-                if self
-                    .snapshot
-                    .contains_block_status(&to_fetch.hash(), BlockStatus::BLOCK_STORED)
-                {
-                    continue;
-                }
+                for to_fetch in candidates.into_iter().rev() {
+                    // NOTE: Filtering `BLOCK_STORED` but not `BLOCK_RECEIVED`, is for avoiding
+                    // stopping synchronization even when orphan_pool maintains dirty items by bugs.
+                    if self
+                        .snapshot
+                        .contains_block_status(&to_fetch.hash(), BlockStatus::BLOCK_STORED)
+                    {
+                        continue;
+                    }
 
-                if inflight.insert(self.peer, to_fetch.hash()) {
-                    trace!(
-                        "[Synchronizer] inflight insert {:?}------------{}",
-                        to_fetch.number(),
-                        to_fetch.hash(),
-                    );
-                    fetch.push(to_fetch.hash());
+                    if inflight.insert(self.peer, to_fetch.hash()) {
+                        trace!(
+                            "[Synchronizer] inflight insert {:?}------------{}",
+                            to_fetch.number(),
+                            to_fetch.hash(),
+                        );
+                        fetch.push(to_fetch.hash());
+                    }
                 }
             }
         }
