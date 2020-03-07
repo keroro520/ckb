@@ -536,18 +536,22 @@ impl HeaderView {
         F: FnMut(&Byte32) -> Option<HeaderView>,
     {
         self.skip_hash = get_header_view(&self.parent_hash())
-            .and_then(|parent| parent.get_ancestor(get_skip_height(self.number()), get_header_view))
+            .and_then(|parent| {
+                parent.get_ancestor(get_skip_height(self.number()), get_header_view, |_| None)
+            })
             .map(|header| header.hash());
     }
 
     // NOTE: get_header_view may change source state, for cache or for tests
-    pub fn get_ancestor<F>(
+    pub fn get_ancestor<F, G>(
         self,
         number: BlockNumber,
         mut get_header_view: F,
+        fast_scanner: G,
     ) -> Option<core::HeaderView>
     where
         F: FnMut(&Byte32) -> Option<HeaderView>,
+        G: Fn(&HeaderView) -> Option<HeaderView>,
     {
         let timestamp = unix_time_as_millis();
         let mut current = self;
@@ -577,6 +581,10 @@ impl HeaderView {
                     current = get_header_view(&current.parent_hash())?;
                     number_walk -= 1;
                 }
+            }
+            if let Some(target) = fast_scanner(&current) {
+                current = target;
+                break;
             }
         }
         metric!({
@@ -1026,15 +1034,21 @@ impl SyncSnapshot {
     }
 
     pub fn get_ancestor(&self, base: &Byte32, number: BlockNumber) -> Option<core::HeaderView> {
-        // shortcut to return a ancestor block
-        if self.store().is_main_chain(&base) {
-            return self
-                .store()
-                .get_block_hash(number)
-                .and_then(|hash| self.get_header_view(&hash).map(HeaderView::into_inner));
-        }
-        self.get_header_view(base)?
-            .get_ancestor(number, |hash| self.get_header_view(hash))
+        let tip_number = self.tip_number();
+        self.get_header_view(base)?.get_ancestor(
+            number,
+            |hash| self.get_header_view(hash),
+            |current| {
+                // shortcut to return a ancestor block
+                if current.number() <= tip_number && self.store().is_main_chain(&current.hash()) {
+                    self.store()
+                        .get_block_hash(number)
+                        .and_then(|hash| self.get_header_view(&hash))
+                } else {
+                    None
+                }
+            },
+        )
     }
 
     pub fn get_locator(&self, start: &core::HeaderView) -> Vec<Byte32> {
@@ -1401,10 +1415,14 @@ mod tests {
                 .get(&hashes[&a])
                 .cloned()
                 .unwrap()
-                .get_ancestor(b, |hash| {
-                    count += 1;
-                    header_map.get(hash).cloned()
-                })
+                .get_ancestor(
+                    b,
+                    |hash| {
+                        count += 1;
+                        header_map.get(hash).cloned()
+                    },
+                    |_| None,
+                )
                 .unwrap();
 
             // Search must finished in <limit> steps
