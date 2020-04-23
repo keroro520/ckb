@@ -15,7 +15,7 @@ tokio = { version = "0.2.11", features = ["time", "io-util", "tcp", "dns", "rt-t
 tokio-util = { version = "0.2.0", features = ["codec"] }
 futures = "0.3"
 crossbeam-channel = "0.3"
-p2p = { package="tentacle", features = ["molc"], git = "https://github.com/nervosnetwork/p2p.git", recv = "16e319a3bcaaf3e7ad66c20f545e17bf92be8db9" }
+p2p = { package="tentacle", features = ["molc"], git = "https://github.com/nervosnetwork/p2p.git", rev = "16e319a3bcaaf3e7ad66c20f545e17bf92be8db9" }
 faketime = "0.2.0"
 lazy_static = "1.3.0"
 bs58 = "0.3.0"
