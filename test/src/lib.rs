@@ -1,4 +1,5 @@
 pub mod assertion;
+pub mod generic;
 mod net;
 mod node;
 mod rpc;
