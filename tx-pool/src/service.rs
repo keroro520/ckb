@@ -1,8 +1,6 @@
 use crate::block_assembler::BlockAssembler;
-use crate::component::entry::TxEntry;
 use crate::error::handle_try_send_error;
 use crate::pool::{TxPool, TxPoolInfo};
-use crate::process::PlugTarget;
 use ckb_app_config::{BlockAssemblerConfig, TxPoolConfig};
 use ckb_async_runtime::{new_runtime, Handle};
 use ckb_chain_spec::consensus::Consensus;
@@ -23,6 +21,9 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::Ordering;
 use std::sync::{atomic::AtomicU64, Arc};
 use tokio::sync::{mpsc, oneshot, RwLock};
+
+#[cfg(test)]
+use crate::{component::entry::TxEntry, process::PlugTarget};
 
 pub const DEFAULT_CHANNEL_SIZE: usize = 512;
 
@@ -83,6 +84,7 @@ pub enum Message {
     GetTxPoolInfo(Request<(), TxPoolInfo>),
     FetchTxRPC(Request<ProposalShortId, Option<(bool, TransactionView)>>),
     NewUncle(Notify<UncleBlockView>),
+    #[cfg(test)]
     PlugEntry(Request<(Vec<TxEntry>, PlugTarget), ()>),
     ClearPool(Request<Arc<Snapshot>, ()>),
 }
@@ -187,6 +189,7 @@ impl TxPoolController {
         self.handle.block_on(response).map_err(Into::into)
     }
 
+    #[cfg(test)]
     pub fn plug_entry(
         &self,
         entries: Vec<TxEntry>,
@@ -518,6 +521,7 @@ async fn process(service: TxPoolService, message: Message) {
                     .store(unix_time_as_millis(), Ordering::SeqCst);
             }
         }
+        #[cfg(test)]
         Message::PlugEntry(Request {
             responder,
             arguments: (entries, target),

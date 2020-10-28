@@ -38,6 +38,7 @@ use std::sync::{atomic::AtomicU64, Arc};
 use std::{cmp, iter};
 use tokio::task::block_in_place;
 
+#[cfg(test)]
 pub enum PlugTarget {
     Pending,
     Proposed,

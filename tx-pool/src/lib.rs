@@ -6,6 +6,7 @@ mod process;
 pub mod service;
 
 pub use component::entry::TxEntry;
+#[cfg(test)]
 pub use process::PlugTarget;
 pub use service::{TxPoolController, TxPoolServiceBuilder};
 pub use tokio::sync::RwLock as TokioRwLock;
